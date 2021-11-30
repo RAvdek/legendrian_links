@@ -1,0 +1,4 @@
+# python dev junk
+.idea
+*.pyc
+*__pycache__*
