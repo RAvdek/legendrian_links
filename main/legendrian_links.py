@@ -16,8 +16,12 @@ class DiskSegment(object):
         self.left_endpoints = left_endpoints
         self.right_endpoints = right_endpoints
 
+    def get_endpoints(self):
+        return [self.left_endpoints, self.right_endpoints]
+
     def to_dict(self):
         return {
+            "x": self.x,
             "top_crossing_height": self.top_crossing_height,
             "bottom_crossing_height": self.bottom_crossing_height,
             "left_crossing_height": self.left_crossing_height,
@@ -69,8 +73,6 @@ class DiskSegmentGraph(object):
                 if self.vertices_are_adjacent(i, j):
                     self.edges.append([i, j])
 
-    #
-
     def compute_paths_from_vertex(self, i):
         if self.vertex_is_terminal(i):
             return [[i]]
@@ -82,7 +84,7 @@ class DiskSegmentGraph(object):
         for i in range(len(self.vertices)):
             if self.vertex_is_initial(i):
                 paths += self.compute_paths_from_vertex(i)
-        # paths = [p for p in paths if self.vertex_is_terminal(p[-1])]
+        paths = [p for p in paths if self.vertex_is_terminal(p[-1])]
         LOG.info(f"DG paths: {paths}")
         return paths
 
@@ -99,34 +101,49 @@ class Disk(list):
     agree with the left endpoints of the next. This is supposed to model an index 1
     J-disk in the Lagrangian projection determined by a Lagrangian resolution."""
 
+    def get_endpoints(self):
+        return [ds.get_endpoints() for ds in self]
+
     def get_asymptotics(self):
         #TODO: This function appears to be broken
         asymptotics = []
         for d in self:
             if d.left_crossing_height is not None:
                 asymptotics.append({
-                    'x': d.x,
-                    'y': d.left_crossing_height,
-                    'z': 1
+                    'type': 'l',
+                    'coords': {
+                        'x': d.x,
+                        'y': d.left_crossing_height,
+                        'z': 1
+                    }
                 })
             if d.bottom_crossing_height is not None:
                 asymptotics.append({
-                    'x': d.x,
-                    'y': d.bottom_crossing_height,
-                    'z': -1
+                    'type': 'b',
+                    'coords': {
+                        'x': d.x,
+                        'y': d.bottom_crossing_height,
+                        'z': -1
+                    }
                 })
         for d in reversed(self):
             if d.right_crossing_height is not None:
                 asymptotics.append({
-                    'x': d.x,
-                    'y': d.right_crossing_height,
-                    'z': 1
+                    'type': 'r',
+                    'coords': {
+                        'x': d.x,
+                        'y': d.right_crossing_height,
+                        'z': 1
+                    }
                 })
             if d.top_crossing_height is not None:
                 asymptotics.append({
-                    'x': d.x,
-                    'y': d.top_crossing_height,
-                    'z': -1
+                    'type': 't',
+                    'coords': {
+                        'x': d.x,
+                        'y': d.top_crossing_height,
+                        'z': -1
+                    }
                 })
         return asymptotics
 
@@ -143,14 +160,14 @@ class PlatSegment(object):
         self.right_close = right_close
         self.crossing_height = crossing_height
 
-        self.left_knot_labels = [None for _ in range(n_strands)]
-        self.right_knot_labels = [None for _ in range(n_strands)]
-
-    def set_left_knot_label(self, i, j):
-        self.left_knot_labels[i] = j
-
-    def set_right_knot_label(self, i, j):
-        self.left_knot_labels[i] = j
+    def to_dict(self):
+        return {
+            "x": self.x,
+            "n_strands": self.n_strands,
+            "left_close": self.left_close,
+            "right_close": self.right_close,
+            "crossing_height": self.crossing_height
+        }
 
     def get_disk_segments(self):
         # enumerate all of the disk segments and return them as a set
@@ -167,10 +184,10 @@ class PlatSegment(object):
                     disk_segments.append(DiskSegment(x=self.x, left_endpoints=[i, i+1]))
             return disk_segments
 
-        # the ones without crossings are
+        # completely horizontal
         for i in range(0, self.n_strands - 1):
             for j in range(i + 1, self.n_strands):
-                if self.crossing_height not in [i, j]:
+                if self.crossing_height not in [i-1, i, j-1, j]:
                     disk_segments.append(DiskSegment(
                         x=self.x, left_endpoints=[i, j], right_endpoints=[i, j]))
         # with an upward shift on the bottom
@@ -186,7 +203,7 @@ class PlatSegment(object):
                 left_endpoints=[bottom_height, self.crossing_height],
                 right_endpoints=[bottom_height, self.crossing_height + 1]))
         # with a downward shift on the bottom
-        for top_height in range(self.crossing_height + 2, self.n_strands):
+        for top_height in range(self.crossing_height + 1, self.n_strands):
             disk_segments.append(DiskSegment(
                 x=self.x,
                 left_endpoints=[self.crossing_height + 1, top_height],
@@ -205,12 +222,12 @@ class PlatSegment(object):
                 right_endpoints=[bottom_height, self.crossing_height],
                 top_crossing_height=self.crossing_height))
         # with a crossing on the bottom
-        for top_height in range(self.crossing_height + 1, self.crossing_height):
+        for top_height in range(self.crossing_height + 1, self.n_strands):
             disk_segments.append(DiskSegment(
                 x=self.x,
                 left_endpoints=[self.crossing_height + 1, top_height],
                 right_endpoints=[self.crossing_height + 1, top_height],
-                bottom_crossing_height=self.crossing_height))
+                top_crossing_height=self.crossing_height))
         # with a crossing on the left
         disk_segments.append(DiskSegment(
             x=self.x,
@@ -271,17 +288,3 @@ class PlatDiagram(object):
         LOG.info(f"{len(disk_graph.vertices)} disk_graph vertices")
         LOG.info(f"{len(disk_graph.edges)} disk_graph edges")
         return disk_graph
-
-    def _add_knot_labels_from_left(self, height, knot_index):
-        self.plat_segments[0].set_left_knot_label(height, knot_index)
-        self.plat_segments[0].set_right_knot_label(height, knot_index)
-        current_height = 0
-        for i in range(1, len(self.plat_segments)):
-            self.plat_segments[i].set_left_knot_label(current_height, knot_index)
-            if self.plat_segments[i].crossing_height == current_height:
-                current_height += 1
-            if self.plat_segments[i].crossing_height == current_height - 1:
-                current_height -= 1
-            self.plat_segments[i].set_right_knot_label(current_height, knot_index)
-
-        self.plat_segments[-1].set_left_knot_label(current_height, knot_index)
