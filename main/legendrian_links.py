@@ -69,18 +69,21 @@ class DiskSegmentGraph(object):
                 if self.vertices_are_adjacent(i, j):
                     self.edges.append([i, j])
 
+    #
+
     def compute_paths_from_vertex(self, i):
         if self.vertex_is_terminal(i):
-            return [i]
+            return [[i]]
         outgoing_vertices = [e[1] for e in self.edges if e[0] == i]
-        return [[i] + self.compute_paths_from_vertex(v) for v in outgoing_vertices]
+        return [[i] + p for v in outgoing_vertices for p in self.compute_paths_from_vertex(v)]
 
     def compute_paths(self):
         paths = []
         for i in range(len(self.vertices)):
             if self.vertex_is_initial(i):
                 paths += self.compute_paths_from_vertex(i)
-        paths = [p for p in paths if self.vertex_is_terminal(p[-1])]
+        # paths = [p for p in paths if self.vertex_is_terminal(p[-1])]
+        LOG.info(f"DG paths: {paths}")
         return paths
 
     def path_to_disk(self, index_path):
@@ -97,6 +100,7 @@ class Disk(list):
     J-disk in the Lagrangian projection determined by a Lagrangian resolution."""
 
     def get_asymptotics(self):
+        #TODO: This function appears to be broken
         asymptotics = []
         for d in self:
             if d.left_crossing_height is not None:
@@ -113,7 +117,6 @@ class Disk(list):
                 })
         for d in reversed(self):
             if d.right_crossing_height is not None:
-                LOG.info("blah")
                 asymptotics.append({
                     'x': d.x,
                     'y': d.right_crossing_height,
@@ -245,6 +248,7 @@ class PlatDiagram(object):
 
         self.disk_graph = self._get_disk_graph()
         self.disks = self.disk_graph.compute_disks()
+        LOG.info(f"Disks in plat diagram: {len(self.disks)}")
 
     def get_disk_asymptotics(self):
         return [d.get_asymptotics() for d in self.disks]
@@ -257,6 +261,8 @@ class PlatDiagram(object):
             for d in disk_segments:
                 disk_graph.add_vertex(d)
         disk_graph.compute_edges()
+        LOG.info(f"{len(disk_graph.vertices)} disk_graph vertices")
+        LOG.info(f"{len(disk_graph.edges)} disk_graph edges")
         return disk_graph
 
     def _add_knot_labels_from_left(self, height, knot_index):
