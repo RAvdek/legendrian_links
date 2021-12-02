@@ -237,8 +237,9 @@ class PlatDiagram(object):
         x = 1
         # add internal segments with crossings in the style of Sivek's software
         if crossings is not None:
-            self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, crossing_height=x))
-            x += 1
+            for c in crossings:
+                self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, crossing_height=c))
+                x += 1
         # add crossings for right-pointing cusps
         for i in range(n_strands):
             if i % 2 == 0:
@@ -246,11 +247,17 @@ class PlatDiagram(object):
                 x += 1
         self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, right_close=True))
 
+        self.crossings = self._get_crossings()
         self.disk_graph = self._get_disk_graph()
         self.disks = self.disk_graph.compute_disks()
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
+        self.disk_asymptotics = self._get_disk_asymptotics()
 
-    def get_disk_asymptotics(self):
+    def _get_crossings(self):
+        return [{"x": x, "y": self.plat_segments[x].crossing_height}
+                for x in range(1, len(self.plat_segments) - 1)]
+
+    def _get_disk_asymptotics(self):
         return [d.get_asymptotics() for d in self.disks]
 
     def _get_disk_graph(self):
