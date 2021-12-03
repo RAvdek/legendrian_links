@@ -7,11 +7,7 @@ verify_ssl = true
 
 [packages]
 flask = "*"
-numpy = "*"
 jinja2 = "*"
-pandas = "*"
-bumpversion = "*"
-scipy = "*"
 
 [requires]
-python_version = "3.6"
+python_version = "3.9"

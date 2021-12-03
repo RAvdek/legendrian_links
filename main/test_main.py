@@ -13,7 +13,7 @@ class TestLinks(unittest.TestCase):
         self.assertEqual(len([ps for ps in pd.plat_segments if ps.right_close]), 1)
 
         # The x-values of crossings are all distinct
-        crossing_x_values = [c["x"] for c in pd.crossings]
+        crossing_x_values = [c.x for c in pd.crossings]
         self.assertEqual(len(crossing_x_values), len(crossing_x_values))
 
         # Number of disks and crossings are expected
