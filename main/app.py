@@ -23,7 +23,9 @@ APP = Flask(__name__)
 @APP.route('/')
 def home():
     pd = ll.PlatDiagram(4, [1, 1, 1])
-    context = INDEX_TEMPLATE.render()
+    context = INDEX_TEMPLATE.render(
+        plat_svg=pd.get_svg(),
+        disk_corners=[[dc.to_dict() for dc in d] for d in pd.disk_corners])
     return make_response(context)
 
 

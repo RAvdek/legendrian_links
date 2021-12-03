@@ -1,7 +1,15 @@
+import os
+from jinja2 import Template
 import utils
 
 
 LOG = utils.get_logger(__name__)
+
+# Static resources
+STATIC_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'static')
+with open(os.path.join(STATIC_PATH, 'plat_svg.template')) as f:
+    PLAT_SVG_TEMPLATE = Template(f.read())
 
 
 class Crossing(object):
@@ -278,6 +286,46 @@ class PlatDiagram(object):
         self.disks = self.disk_graph.compute_disks()
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self.disk_corners = self._get_disk_corners()
+
+    def get_svg(self):
+        increment = 50
+        pad = 10
+        n_segments = len(self.plat_segments)
+        height = increment * self.n_strands
+        width = (increment * n_segments)
+        lines = []
+
+        for ps in self.plat_segments:
+            if ps.left_close:
+                for i in range(self.n_strands):
+                    if i % 2 == 0:
+                        lines.append([[0, i + .5], [1, i]])
+                    else:
+                        lines.append([[0, i - .5], [1, i]])
+            elif ps.right_close:
+                for i in range(self.n_strands):
+                    if i % 2 == 0:
+                        lines.append([[n_segments - 1, i], [n_segments, i + .5]])
+                    else:
+                        lines.append([[n_segments - 1, i], [n_segments, i - .5]])
+            else:
+                x = ps.x
+                crossing_y = ps.crossing_y
+                for s in range(self.n_strands):
+                    if s == crossing_y:
+                        lines.append([[x, s], [x + 1, s + 1]])
+                    elif s == crossing_y + 1:
+                        lines.append([[x, s], [x + 1, s - 1]])
+                    else:
+                        lines.append([[x, s],[x + 1, s]])
+        lines = [
+                    [
+                        [pad + int(increment * l[0][0]), pad + int(height - (increment * l[0][1]))],
+                        [pad + int(increment * l[1][0]), pad + int(height - (increment * l[1][1]))]
+                    ]
+                for l in lines]
+        return PLAT_SVG_TEMPLATE.render(height=height + 2*pad, width=width + 2*pad, lines=lines)
+
 
     def _get_crossings(self):
         return [Crossing(x=x, y=self.plat_segments[x].crossing_y)
