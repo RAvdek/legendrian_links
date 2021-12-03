@@ -1,4 +1,9 @@
+import json
 import logging
+
+
+with open('links.json') as f:
+    LINKS = json.loads(f.read())
 
 
 def get_logger(name):

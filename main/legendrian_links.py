@@ -5,12 +5,6 @@ import utils
 
 LOG = utils.get_logger(__name__)
 
-# Static resources
-STATIC_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), 'static')
-with open(os.path.join(STATIC_PATH, 'plat_svg.template')) as f:
-    PLAT_SVG_TEMPLATE = Template(f.read())
-
 
 class Crossing(object):
 
@@ -142,7 +136,7 @@ class Disk(list):
         disk_corners = []
         for ds in self:
             if ds.disk_corner is not None:
-                if ds.disk_corner.corner in ['l', 'b']:
+                if ds.disk_corner.corner in ['l', 'd']:
                     disk_corners.append(ds.disk_corner)
         for ds in reversed(self):
             if ds.disk_corner is not None:
@@ -287,9 +281,7 @@ class PlatDiagram(object):
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self.disk_corners = self._get_disk_corners()
 
-    def get_svg(self):
-        increment = 50
-        pad = 10
+    def get_svg_context(self, increment=50, pad=10):
         n_segments = len(self.plat_segments)
         height = increment * self.n_strands
         width = (increment * n_segments)
@@ -320,11 +312,15 @@ class PlatDiagram(object):
                         lines.append([[x, s],[x + 1, s]])
         lines = [
                     [
-                        [pad + int(increment * l[0][0]), pad + int(height - (increment * l[0][1]))],
-                        [pad + int(increment * l[1][0]), pad + int(height - (increment * l[1][1]))]
+                        [pad + int(increment * l[0][0]), pad + int(increment * l[0][1])],
+                        [pad + int(increment * l[1][0]), pad + int(increment * l[1][1])]
                     ]
                 for l in lines]
-        return PLAT_SVG_TEMPLATE.render(height=height + 2*pad, width=width + 2*pad, lines=lines)
+        return {
+            "height": height + 2*pad,
+            "width": width + 2*pad,
+            "lines": lines
+        }
 
 
     def _get_crossings(self):

@@ -1,8 +1,17 @@
 <!doctype html>
 <body>
-{{ plat_svg }}
+<svg height="{{ height }}" width="{{ width }}">
+  {% for line in lines %}
+  <line
+    x1="{{ line[0][0] }}" y1="{{ line[0][1] }}" x2="{{ line[1][0] }}" y2="{{ line[1][1] }}"
+    style="stroke:rgb(255,0,0);stroke-width:2"
+  />
+  {% endfor %}
+</svg>
 <br>
-{% for dc in disk_corners %}
- {{ dc }}<br>
+{% for d in disk_corners %}
+  {% for c in d %}
+    {{c.crossing.x}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}
+  {% endfor %}<br>
 {% endfor %}
 </body>

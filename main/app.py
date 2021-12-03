@@ -1,4 +1,3 @@
-import json
 import os
 from flask import (
     Flask,
@@ -7,7 +6,10 @@ from flask import (
     redirect,
     url_for)
 from jinja2 import Template
+import utils
 import legendrian_links as ll
+
+LINKS = utils.LINKS
 
 # Static resources
 STATIC_PATH = os.path.join(
@@ -22,10 +24,12 @@ APP = Flask(__name__)
 
 @APP.route('/')
 def home():
-    pd = ll.PlatDiagram(4, [1, 1, 1])
-    context = INDEX_TEMPLATE.render(
-        plat_svg=pd.get_svg(),
-        disk_corners=[[dc.to_dict() for dc in d] for d in pd.disk_corners])
+    link = LINKS['m10_132_nv']
+    del link['comment']
+    pd = ll.PlatDiagram(**link)
+    template_context = pd.get_svg_context()
+    template_context['disk_corners'] = pd.disk_corners
+    context = INDEX_TEMPLATE.render(**template_context)
     return make_response(context)
 
 
