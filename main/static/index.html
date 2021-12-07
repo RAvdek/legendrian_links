@@ -6,7 +6,7 @@ Lagrangian resolution of the plat:
   {% for line in lines %}
   <line
     x1="{{ line[0][0] }}" y1="{{ line[0][1] }}" x2="{{ line[1][0] }}" y2="{{ line[1][1] }}"
-    style="stroke:rgb(255,0,0);stroke-width:2"
+    style="stroke:rgb({{ line[2][0] }},{{ line[2][1] }},{{ line[2][2] }});stroke-width:4"
   />
   {% endfor %}
   {% for thing in x_labels %}

@@ -22,13 +22,22 @@ with open(HTML_PATH) as f:
 # App resources
 APP = Flask(__name__)
 
+KNOT_COLORS = [
+    (255, 0, 0),
+    (128, 0, 128),
+    (0, 0, 255),
+    (0, 128, 128),
+    (0, 255, 0),
+    (128, 128, 0)
+]
+
 
 def get_template_context(plat_diagram, increment=50, pad=10):
     n_strands = plat_diagram.n_strands
     n_segments = len(plat_diagram.plat_segments)
     height = increment * plat_diagram.n_strands + pad
     width = (increment * n_segments) + pad + increment
-    line_segments = plat_diagram.get_line_segments()
+    line_segments = plat_diagram.get_line_segment_arrays()
     disk_corners = plat_diagram.disk_corners
     template_context = {
         "pad": pad,
@@ -38,7 +47,8 @@ def get_template_context(plat_diagram, increment=50, pad=10):
         "lines": [
             [
                 [increment + pad + int(increment * l[0][0]), pad + int(increment * l[0][1])],
-                [increment + pad + int(increment * l[1][0]), pad + int(increment * l[1][1])]
+                [increment + pad + int(increment * l[1][0]), pad + int(increment * l[1][1])],
+                KNOT_COLORS[l[2]],
             ]
             for l in line_segments],
         'n_disks': len(disk_corners),
