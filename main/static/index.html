@@ -7,8 +7,20 @@
     style="stroke:rgb(255,0,0);stroke-width:2"
   />
   {% endfor %}
+  {% for thing in x_labels %}
+    <text x="{{ thing['x'] }}" y="{{ height }}">
+      {{ thing["label"] }}
+    </text>
+  {% endfor %}
+  {% for thing in y_labels %}
+    <text x="{{ pad }}" y="{{ thing['y'] }}">
+      {{ thing["label"] }}
+    </text>
+  {% endfor %}
 </svg>
-<br>
+<br><br>
+Asymptotics of index=1 holomorphic disks:
+<br><br>
 {% for d in disk_corners %}
   {% for c in d %}
     {{c.crossing.x}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}

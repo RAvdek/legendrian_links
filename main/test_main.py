@@ -6,7 +6,7 @@ class TestLinks(unittest.TestCase):
 
     def _test_link(self, n_strands, crossings, n_crossings, n_disks):
 
-        pd = ll.PlatDiagram(n_strands=n_strands, crossings=crossings)
+        pd = ll.PlatDiagram(n_strands=n_strands, front_crossings=crossings)
 
         # There is exactly one right close and one left close
         self.assertEqual(len([ps for ps in pd.plat_segments if ps.left_close]), 1)

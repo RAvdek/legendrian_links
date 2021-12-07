@@ -193,49 +193,49 @@ class PlatSegment(object):
                         disk_corner=None,
                         left_endpoints=[i, j],
                         right_endpoints=[i, j]))
+        # with an downward shift on the top
+        for bottom_height in range(self.crossing_y + 2, self.n_strands):
+            disk_segments.append(DiskSegment(
+                x=self.x,
+                disk_corner=None,
+                left_endpoints=[self.crossing_y, bottom_height],
+                right_endpoints=[self.crossing_y + 1, bottom_height]))
         # with an upward shift on the bottom
-        for top_height in range(self.crossing_y + 2, self.n_strands):
+        for top_height in range(0, self.crossing_y):
             disk_segments.append(DiskSegment(
                 x=self.x,
                 disk_corner=None,
-                left_endpoints=[self.crossing_y, top_height],
-                right_endpoints=[self.crossing_y + 1, top_height]))
-        # with an upward shift on the top
-        for bottom_height in range(0, self.crossing_y):
-            disk_segments.append(DiskSegment(
-                x=self.x,
-                disk_corner=None,
-                left_endpoints=[bottom_height, self.crossing_y],
-                right_endpoints=[bottom_height, self.crossing_y + 1]))
-        # with a downward shift on the bottom
-        for top_height in range(self.crossing_y + 1, self.n_strands):
-            disk_segments.append(DiskSegment(
-                x=self.x,
-                disk_corner=None,
-                left_endpoints=[self.crossing_y + 1, top_height],
-                right_endpoints=[self.crossing_y, top_height]))
+                left_endpoints=[top_height, self.crossing_y],
+                right_endpoints=[top_height, self.crossing_y + 1]))
         # with a downward shift on the top
-        for bottom_height in range(0, self.crossing_y):
+        for bottom_height in range(self.crossing_y + 1, self.n_strands):
             disk_segments.append(DiskSegment(
                 x=self.x,
                 disk_corner=None,
-                left_endpoints=[bottom_height, self.crossing_y + 1],
-                right_endpoints=[bottom_height, self.crossing_y]))
+                left_endpoints=[self.crossing_y + 1, bottom_height],
+                right_endpoints=[self.crossing_y, bottom_height]))
+        # with a downward shift on the bottom
+        for top_height in range(0, self.crossing_y):
+            disk_segments.append(DiskSegment(
+                x=self.x,
+                disk_corner=None,
+                left_endpoints=[top_height, self.crossing_y + 1],
+                right_endpoints=[top_height, self.crossing_y]))
         # a crossing appears in all other cases
         crossing = Crossing(x=self.x, y=self.crossing_y)
-        # with a crossing on the top
-        for bottom_height in range(0, self.crossing_y):
+        # with a crossing on the bottom
+        for top_height in range(0, self.crossing_y):
             disk_segments.append(DiskSegment(
                 x=self.x,
-                disk_corner=DiskCorner(crossing=crossing, corner='u'),
-                left_endpoints=[bottom_height, self.crossing_y],
-                right_endpoints=[bottom_height, self.crossing_y]
+                disk_corner=DiskCorner(crossing=crossing, corner='d'),
+                left_endpoints=[top_height, self.crossing_y],
+                right_endpoints=[top_height, self.crossing_y]
             ))
         # with a crossing on the bottom
         for top_height in range(self.crossing_y + 1, self.n_strands):
             disk_segments.append(DiskSegment(
                 x=self.x,
-                disk_corner=DiskCorner(crossing=crossing, corner='d'),
+                disk_corner=DiskCorner(crossing=crossing, corner='u'),
                 left_endpoints=[self.crossing_y + 1, top_height],
                 right_endpoints=[self.crossing_y + 1, top_height],
             ))
@@ -256,16 +256,17 @@ class PlatSegment(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, crossings=None):
+    def __init__(self, n_strands, front_crossings=None):
         self.n_strands = n_strands
+        self.front_crossings = front_crossings
 
         # build self.plat_segments
         x = 0
         self.plat_segments = [PlatSegment(x=x, n_strands=self.n_strands, left_close=True)]
         x = 1
         # add internal segments with crossings in the style of Sivek's software
-        if crossings is not None:
-            for c in crossings:
+        if front_crossings is not None:
+            for c in front_crossings:
                 self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, crossing_y=c))
                 x += 1
         # add crossings for right-pointing cusps
@@ -281,10 +282,12 @@ class PlatDiagram(object):
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self.disk_corners = self._get_disk_corners()
 
-    def get_svg_context(self, increment=50, pad=10):
+    def get_n_copy(self):
+        #TODO
+        pass
+    
+    def get_line_segments(self):
         n_segments = len(self.plat_segments)
-        height = increment * self.n_strands
-        width = (increment * n_segments)
         lines = []
 
         for ps in self.plat_segments:
@@ -310,17 +313,7 @@ class PlatDiagram(object):
                         lines.append([[x, s], [x + 1, s - 1]])
                     else:
                         lines.append([[x, s],[x + 1, s]])
-        lines = [
-                    [
-                        [pad + int(increment * l[0][0]), pad + int(increment * l[0][1])],
-                        [pad + int(increment * l[1][0]), pad + int(increment * l[1][1])]
-                    ]
-                for l in lines]
-        return {
-            "height": height + 2*pad,
-            "width": width + 2*pad,
-            "lines": lines
-        }
+        return lines
 
 
     def _get_crossings(self):
