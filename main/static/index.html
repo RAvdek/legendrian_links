@@ -1,5 +1,7 @@
 <!doctype html>
 <body>
+Lagrangian resolution of the plat:
+<br><br>
 <svg height="{{ height }}" width="{{ width }}">
   {% for line in lines %}
   <line
@@ -19,7 +21,7 @@
   {% endfor %}
 </svg>
 <br><br>
-Asymptotics of index=1 holomorphic disks:
+A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
 {% for d in disk_corners %}
   {% for c in d %}

@@ -285,7 +285,7 @@ class PlatDiagram(object):
     def get_n_copy(self):
         #TODO
         pass
-    
+
     def get_line_segments(self):
         n_segments = len(self.plat_segments)
         lines = []

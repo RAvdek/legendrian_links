@@ -29,6 +29,7 @@ def get_template_context(plat_diagram, increment=50, pad=10):
     height = increment * plat_diagram.n_strands + pad
     width = (increment * n_segments) + pad + increment
     line_segments = plat_diagram.get_line_segments()
+    disk_corners = plat_diagram.disk_corners
     template_context = {
         "pad": pad,
         "increment": increment,
@@ -40,7 +41,8 @@ def get_template_context(plat_diagram, increment=50, pad=10):
                 [increment + pad + int(increment * l[1][0]), pad + int(increment * l[1][1])]
             ]
             for l in line_segments],
-        'disk_corners': plat_diagram.disk_corners,
+        'n_disks': len(disk_corners),
+        'disk_corners': disk_corners,
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],
         'y_labels': [{"label": y, "y": int(pad + increment * y + increment / 2)} for y in range(n_strands - 1)]
     }
