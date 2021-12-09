@@ -5,9 +5,12 @@ Lagrangian resolution of the plat:
 <svg height="{{ height }}" width="{{ width }}">
   {% for line in lines %}
   <line
-    x1="{{ line[0][0] }}" y1="{{ line[0][1] }}" x2="{{ line[1][0] }}" y2="{{ line[1][1] }}"
-    style="stroke:rgb({{ line[2][0] }},{{ line[2][1] }},{{ line[2][2] }});stroke-width:4"
+    x1="{{ line['start_xy'][0] }}" y1="{{ line['start_xy'][1] }}" x2="{{ line['end_xy'][0] }}" y2="{{ line['end_xy'][1] }}"
+    style="stroke:rgb({{ line['rgb'][0] }},{{ line['rgb'][1] }},{{ line['rgb'][2] }});stroke-width:4"
   />
+  <text x="{{ line['label']['x'] }}" y="{{ line['label']['y'] }}">
+      {{ line['label']['marker'] }}
+  </text>
   {% endfor %}
   {% for thing in x_labels %}
     <text x="{{ thing['x'] }}" y="{{ height }}">
@@ -25,7 +28,7 @@ A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
 {% for d in disk_corners %}
   {% for c in d %}
-    {{c.crossing.x}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}
+    {{c.crossing.top_line_segment.x_left}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}
   {% endfor %}<br>
 {% endfor %}
 </body>

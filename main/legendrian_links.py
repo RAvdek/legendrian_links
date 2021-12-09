@@ -5,14 +5,18 @@ LOG = utils.get_logger(__name__)
 
 
 class Crossing(object):
+    """Object which carries crossing information.
+    Should be able to see the line segments at the positive and negative ends of a chord.
+    From this we should be able to implement signs for holomorphic disks."""
 
 
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    def __init__(self, top_line_segment, bottom_line_segment):
+        self.top_line_segment = top_line_segment
+        self.bottom_line_segment = bottom_line_segment
 
 
 class DiskCorner(object):
+    """Convex corner of a disk in the Lagrangian projection. Corner type tells the direction it points."""
     CORNER_TYPES = {
         'l': '+',
         'r': '+',
@@ -20,18 +24,18 @@ class DiskCorner(object):
         'd': '-'
     }
 
-
     def __init__(self, crossing, corner):
         self.crossing = crossing
         if corner not in self.CORNER_TYPES.keys():
             raise ValueError(f"Incoming type {corner} not in {self.CORNER_TYPES}")
         self.corner = corner
 
-
     def to_dict(self):
         return {
-            'x': self.crossing.x,
-            'y': self.crossing.y,
+            'x': self.crossing.top_line_segment.x_left,
+            'y': self.crossing.top_line_segment.y_left,
+            'from_knot': self.crossing.bottom_line_segment.knot_label,
+            'to_knot': self.crossing.top_line_segment.knot_label,
             'corner': self.corner,
             'pos_neg': self.CORNER_TYPES[self.corner]
         }
@@ -47,10 +51,8 @@ class DiskSegment(object):
         self.left_endpoints = left_endpoints
         self.right_endpoints = right_endpoints
 
-
     def get_endpoints(self):
         return [self.left_endpoints, self.right_endpoints]
-
 
     def to_dict(self):
         output = dict()
@@ -65,16 +67,13 @@ class DiskSegment(object):
 class DiskSegmentGraph(object):
     """A directed graph which encodes how DiskSegments with x coordinates are linked together"""
 
-
     def __init__(self, n_segments):
         self.vertices = list()
         self.edges = list()
         self.n_segments = n_segments
 
-
     def add_vertex(self, disk_segment):
         self.vertices.append(disk_segment)
-
 
     def vertex_is_initial(self, i):
         vertex = self.vertices[i]
@@ -82,20 +81,17 @@ class DiskSegmentGraph(object):
             return True
         return False
 
-
     def vertex_is_terminal(self, i):
         vertex = self.vertices[i]
         if (vertex.x == self.n_segments - 1) or (vertex.corner == 'r'):
             return True
         return False
 
-
     def vertex_dead_end(self, i):
         for e in self.edges:
             if e[0] == i:
                 return True
         return False
-
 
     def vertices_are_consecutive(self, i, j):
         v_left = self.vertices[i]
@@ -104,20 +100,17 @@ class DiskSegmentGraph(object):
             return False
         return v_left.right_endpoints == v_right.left_endpoints
 
-
     def compute_edges(self):
         for i in range(len(self.vertices)):
             for j in range(len(self.vertices)):
                 if self.vertices_are_consecutive(i, j):
                     self.edges.append([i, j])
 
-
     def compute_paths_from_vertex(self, i):
         if self.vertex_is_terminal(i):
             return [[i]]
         outgoing_vertices = [e[1] for e in self.edges if e[0] == i]
         return [[i] + p for v in outgoing_vertices for p in self.compute_paths_from_vertex(v)]
-
 
     def compute_paths(self):
         paths = []
@@ -128,10 +121,8 @@ class DiskSegmentGraph(object):
         LOG.info(f"DG paths: {paths}")
         return paths
 
-
     def path_to_disk(self, index_path):
         return Disk([self.vertices[i] for i in index_path])
-
 
     def compute_disks(self):
         paths = self.compute_paths()
@@ -143,10 +134,8 @@ class Disk(list):
     agree with the left endpoints of the next. This is supposed to model an index 1
     J-disk in the Lagrangian projection determined by a Lagrangian resolution."""
 
-
     def get_endpoints(self):
         return [ds.get_endpoints() for ds in self]
-
 
     def get_disk_corners(self):
         disk_corners = []
@@ -162,20 +151,40 @@ class Disk(list):
 
 
 class PlatSegment(object):
-    def __init__(self, x, n_strands, crossing_y=None, left_close=False, right_close=False):
-        self.x = x
-        if n_strands % 2 != 0:
-            raise RuntimeError("n_strands should be even")
-        if n_strands < 1:
-            raise RuntimeError("n_strands must be at least 2")
-        self.n_strands = n_strands
+
+    def __init__(self, line_segments, left_close=False, right_close=False):
+        self.line_segments = line_segments
+        self.n_strands = len(line_segments)
         self.left_close = left_close
         self.right_close = right_close
-        self.crossing_y = crossing_y
+        self._set_x()
+        self._set_crossing_data()
 
-        self.left_knot_labels = [None]*n_strands
-        self.right_knot_labels = [None]*n_strands
+    def _set_x(self):
+        x_left_values = list(set([ls.x_left for ls in self.line_segments]))
+        n_x_left_values = len(x_left_values)
+        if n_x_left_values > 1:
+            raise ValueError(f"Found {n_x_left_values} different left x values for line segments in PlatSegment")
+        self.x = x_left_values[0]
 
+    def _set_crossing_data(self):
+        if self.left_close or self.right_close:
+            self.crossing_y = None
+            self.top_line_segment_at_crossing = None
+            self.bottom_line_segment_at_crossing = None
+        else:
+            southeast_segments = [ls for ls in self.line_segments if ls.y_left < ls.y_right]
+            n_southeast_segments = len(southeast_segments)
+            northeast_segments = [ls for ls in self.line_segments if ls.y_left > ls.y_right]
+            n_northeast_segments = len(northeast_segments)
+            if n_southeast_segments != 1 or n_northeast_segments != 1:
+                raise ValueError(f"Trying to initialize PlatSegment at x={self.x} with "
+                                 f"{n_southeast_segments} NE segments and "
+                                 f"{n_northeast_segments} NE segments. "
+                                 f"Line segments: {[ls.to_array() for ls in self.line_segments]}")
+            self.crossing_y = southeast_segments[0].y_left
+            self.top_line_segment_at_crossing = southeast_segments[0]
+            self.bottom_line_segment_at_crossing = northeast_segments[0]
 
     def to_dict(self):
         return {
@@ -185,7 +194,6 @@ class PlatSegment(object):
             "right_close": self.right_close,
             "crossing_y": self.crossing_y
         }
-
 
     def get_disk_segments(self):
         # enumerate all of the disk segments and return them as a set
@@ -240,7 +248,9 @@ class PlatSegment(object):
                 left_endpoints=[top_height, self.crossing_y + 1],
                 right_endpoints=[top_height, self.crossing_y]))
         # a crossing appears in all other cases
-        crossing = Crossing(x=self.x, y=self.crossing_y)
+        crossing = Crossing(
+            top_line_segment=self.top_line_segment_at_crossing,
+            bottom_line_segment=self.bottom_line_segment_at_crossing)
         # with a crossing on the bottom
         for top_height in range(0, self.crossing_y):
             disk_segments.append(DiskSegment(
@@ -283,10 +293,8 @@ class LineSegment(object):
         self.orientation = None
         self.knot_label = None
 
-
     def to_array(self):
         return [[self.x_left, self.y_left], [self.x_right, self.y_right]]
-
 
     def set_orientation(self, o):
         if o not in self.ORIENTATIONS:
@@ -303,73 +311,94 @@ class PlatDiagram(object):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
 
-        self._set_plat_segments()
         self._set_line_segments()
-        self._set_crossings()
+        self._label_line_segments()
+        self._set_plat_segments()
         self._set_disk_graph()
         self._set_disks()
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self._set_disk_corners()
-        self._label_line_segments()
-        self.n_components = len(set([ls.knot_label for ls in self.line_segments]))
-
-
-    def _set_plat_segments(self):
-        x = 0
-        # add segments for left pointing cusps
-        self.plat_segments = [PlatSegment(x=x, n_strands=self.n_strands, left_close=True)]
-        x = 1
-        # add internal segments with crossings in the style of Sivek's software
-        if self.front_crossings is not None:
-            for c in self.front_crossings:
-                self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, crossing_y=c))
-                x += 1
-        # add crossings for right-pointing cusps
-        for i in range(self.n_strands):
-            if i % 2 == 0:
-                self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, crossing_y=i))
-                x += 1
-        self.plat_segments.append(PlatSegment(x=x, n_strands=self.n_strands, right_close=True))
-
-
-    def _set_line_segments(self):
-        n_segments = len(self.plat_segments)
-        lines = []
-
-        for ps in self.plat_segments:
-            if ps.left_close:
-                for i in range(self.n_strands):
-                    if i % 2 == 0:
-                        lines.append(LineSegment(x_left=0, y_left=i + .5, x_right=1, y_right=i))
-                    else:
-                        lines.append(LineSegment(x_left=0, y_left=i - .5, x_right=1, y_right=i))
-            elif ps.right_close:
-                for i in range(self.n_strands):
-                    if i % 2 == 0:
-                        lines.append(LineSegment(x_left=n_segments - 1, y_left=i, x_right=n_segments, y_right=i + .5))
-                    else:
-                        lines.append(LineSegment(x_left=n_segments - 1, y_left=i, x_right=n_segments, y_right=i - .5))
-            else:
-                x = ps.x
-                crossing_y = ps.crossing_y
-                for s in range(self.n_strands):
-                    if s == crossing_y:
-                        lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s + 1))
-                    elif s == crossing_y + 1:
-                        lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s - 1))
-                    else:
-                        lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s))
-        self.line_segments = lines
 
 
     def get_line_segment_arrays(self):
-        return [ls.to_array() + [ls.knot_label] for ls in self.line_segments]
+        return [ls.to_array() + [ls.knot_label, ls.orientation] for ls in self.line_segments]
 
 
-    def _set_crossings(self):
-        self.crossings = [Crossing(x=x, y=self.plat_segments[x].crossing_y)
-                          for x in range(1, len(self.plat_segments) - 1)]
+    def _set_line_segments(self):
+        lines = []
 
+        # make the left closing part
+        x = 0
+        for i in range(self.n_strands):
+            if i % 2 == 0:
+                lines.append(LineSegment(x_left=0, y_left=i + .5, x_right=1, y_right=i))
+            else:
+                lines.append(LineSegment(x_left=0, y_left=i - .5, x_right=1, y_right=i))
+
+        if self.front_crossings is not None:
+            for fcy in self.front_crossings:
+                x += 1
+                for s in range(self.n_strands):
+                    if s == fcy:
+                        lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s + 1))
+                    elif s == fcy + 1:
+                        lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s - 1))
+                    else:
+                        lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s))
+
+        # make crossings for each of the right-pointing cusps
+        for i in [_ for _ in range(self.n_strands) if _ % 2 == 0]:
+            x += 1
+            for j in range(self.n_strands):
+                if j == i:
+                    lines.append(LineSegment(x_left=x, y_left=j, x_right=x + 1, y_right=j + 1))
+                elif j == i + 1:
+                    lines.append(LineSegment(x_left=x, y_left=j, x_right=x + 1, y_right=j - 1))
+                else:
+                    lines.append(LineSegment(x_left=x, y_left=j, x_right=x + 1, y_right=j))
+
+        # make the right closing part
+        x += 1
+        for i in range(self.n_strands):
+            if i % 2 == 0:
+                lines.append(LineSegment(x_left=x, y_left=i, x_right=x + 1, y_right=i + .5))
+            else:
+                lines.append(LineSegment(x_left=x, y_left=i, x_right=x + 1, y_right=i - .5))
+
+        self.line_segments = lines
+
+
+    def _label_line_segments(self):
+        knot_label = 0
+        # The while loops are in danger of being infinite. Cut at an n to debug.
+        n = 0
+        while True:
+            unlabeled_line_segments = [ls for ls in self.line_segments if ls.knot_label is None]
+            n_unlabeled_line_segments = len(unlabeled_line_segments)
+            LOG.info(f"{n_unlabeled_line_segments} line segments unlabeled")
+            if n_unlabeled_line_segments == 0:
+                break
+            initial_ls = unlabeled_line_segments[0]
+            initial_ls.set_knot_label(knot_label)
+            initial_ls.set_orientation('r')
+            ls = self._label_next_line_segment(initial_ls)
+            while ls != initial_ls:
+                LOG.info(ls.to_array())
+                ls = self._label_next_line_segment(ls)
+                n += 1
+            knot_label += 1
+        self.n_components = len(set([ls.knot_label for ls in self.line_segments]))
+
+    def _set_plat_segments(self):
+        max_left_x = max([ls.x_left for ls in self.line_segments])
+        plat_segments = []
+        for x in range(0, max_left_x + 1):
+            left_x_segments = [ls for ls in self.line_segments if ls.x_left == x]
+            left_close = x == 0
+            right_close = x == max_left_x
+            ps = PlatSegment(left_x_segments, left_close=left_close, right_close=right_close)
+            plat_segments.append(ps)
+        self.plat_segments = plat_segments
 
     def _set_disk_graph(self):
         disk_graph = DiskSegmentGraph(n_segments=len(self.plat_segments))
@@ -395,7 +424,9 @@ class PlatDiagram(object):
         search_results = [ls for ls in self.line_segments if ls.x_right == x and ls.y_right == y]
         n_results = len(search_results)
         if n_results != 1:
-            raise RuntimeError(f'Found {n_results} in search for line segment, rather than 1 at x,y={x},{y}')
+            raise RuntimeError(
+                f'Found {n_results} in search for line segment by right_xy, rather than 1 at x,y={x},{y}. '
+                f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
         return search_results[0]
 
 
@@ -403,7 +434,9 @@ class PlatDiagram(object):
         search_results = [ls for ls in self.line_segments if ls.x_left == x and ls.y_left == y]
         n_results = len(search_results)
         if n_results != 1:
-            raise RuntimeError(f'Found {n_results} in search for line segment, rather than 1 at x,y={x},{y}')
+            raise RuntimeError(
+                f'Found {n_results} in search for line segment by left_xy, rather than 1 at x,y={x},{y}. '
+                f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
         return search_results[0]
 
 
@@ -415,8 +448,9 @@ class PlatDiagram(object):
         if ls.knot_label is None:
             raise ValueError('Cannot find knot_label for line_segment')
 
+        max_x_right = max([ls.x_right for ls in self.line_segments])
         if ls.orientation == 'r':
-            if ls.x_right < len(self.plat_segments):
+            if ls.x_right < max_x_right:
                 next_ls = self.get_line_segment_by_left_xy(x=ls.x_right, y=ls.y_right)
                 next_ls.set_orientation('r')
             else:
@@ -438,22 +472,3 @@ class PlatDiagram(object):
 
         next_ls.set_knot_label(ls.knot_label)
         return next_ls
-
-
-    def _label_line_segments(self):
-        knot_label = 0
-        n = 0
-        while True:
-            unlabeled_line_segments = [ls for ls in self.line_segments if ls.knot_label is None]
-            n_unlabeled_line_segments = len(unlabeled_line_segments)
-            LOG.info(f"{n_unlabeled_line_segments} line segments unlabeled")
-            if n_unlabeled_line_segments == 0:
-                break
-            initial_ls = unlabeled_line_segments[0]
-            initial_ls.set_knot_label(knot_label)
-            initial_ls.set_orientation('r')
-            ls = self._label_next_line_segment(initial_ls)
-            while ls != initial_ls:
-                ls = self._label_next_line_segment(ls)
-                n += 1
-            knot_label += 1

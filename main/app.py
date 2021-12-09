@@ -30,6 +30,10 @@ KNOT_COLORS = [
     (0, 255, 0),
     (128, 128, 0)
 ]
+KNOT_ORIENTATIONS_TO_ARROW = {
+    'l': '<',
+    'r': '>'
+}
 
 
 def get_template_context(plat_diagram, increment=50, pad=10):
@@ -45,11 +49,16 @@ def get_template_context(plat_diagram, increment=50, pad=10):
         "height": height,
         "width": width,
         "lines": [
-            [
-                [increment + pad + int(increment * l[0][0]), pad + int(increment * l[0][1])],
-                [increment + pad + int(increment * l[1][0]), pad + int(increment * l[1][1])],
-                KNOT_COLORS[l[2]],
-            ]
+            {
+                'start_xy': [increment + pad + int(increment * l[0][0]), pad + int(increment * l[0][1])],
+                'end_xy': [increment + pad + int(increment * l[1][0]), pad + int(increment * l[1][1])],
+                'rgb': KNOT_COLORS[l[2] % len(KNOT_COLORS)],
+                'label': {
+                    'x': increment + pad + int(increment * (l[0][0] + l[1][0]) / 2),
+                    'y': pad + int(increment * (l[0][1] + l[1][1]) / 2),
+                    'marker': KNOT_ORIENTATIONS_TO_ARROW[l[3]]
+                }
+            }
             for l in line_segments],
         'n_disks': len(disk_corners),
         'disk_corners': disk_corners,
@@ -73,7 +82,7 @@ def home():
                 crossings = [int(x) for x in crossings.split(",")]
             pd = ll.PlatDiagram(n_strands=n_strands, front_crossings=crossings)
         else:
-            data = LINKS[DEFAULT_LINK_KEY]
+            data = LINKS[DEFAULT_LINK_KEY].copy()
             data.pop('comment')
             pd = ll.PlatDiagram(**data)
     template_context = get_template_context(plat_diagram=pd)
