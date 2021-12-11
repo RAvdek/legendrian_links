@@ -1,3 +1,4 @@
+from collections import Counter
 import utils
 
 
@@ -21,6 +22,23 @@ class Chord(object):
                              f"Top {self.top_line_segment.to_array()}, "
                              f"bottom {self.bottom_line_segment.to_array()}")
         self.sign = 1 if self.top_line_segment.orientation == self.bottom_line_segment.orientation else -1
+
+    def is_composable_with(self, chord):
+        return self.top_line_segment.knot_label == chord.bottom_line_segment.knot_label
+
+
+class WordOfChords(object):
+
+    def __init__(self, word):
+        self.word = word
+        self._set_grading()
+        self._set_x_array()
+
+    def _set_grading(self):
+        self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
+
+    def _set_x_array(self):
+        self.x_array = [chord.bottom_line_segment.x_left for chord in self.word]
 
 
 class DiskCorner(object):
@@ -121,6 +139,8 @@ class DiskSegmentGraph(object):
         return [[i] + p for v in outgoing_vertices for p in self.compute_paths_from_vertex(v)]
 
     def compute_paths(self):
+        # TODO: Divide and conquer is suboptimal. Can instead use dynamic which is faster.
+        # This may actually be important for very large numbers of disks.
         paths = []
         for i in range(len(self.vertices)):
             if self.vertex_is_initial(i):
@@ -331,7 +351,8 @@ class PlatDiagram(object):
         self._set_disks()
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self._set_disk_corners()
-
+        self._set_lch_generators()
+        self._set_rsft_generators()
 
     def get_line_segment_arrays(self):
         return [ls.to_array() + [ls.knot_label, ls.orientation] for ls in self.line_segments]
@@ -557,3 +578,25 @@ class PlatDiagram(object):
 
     def _set_disk_corners(self):
         self.disk_corners = [d.get_disk_corners() for d in self.disks]
+
+    def _set_lch_generators(self):
+        self.lch_generators = [WordOfChords([chord]) for chord in self.chords]
+
+    def _set_rsft_generators(self):
+        # length 1 composable words
+        composable_admissible_words = [[[chord] for chord in self.chords]]
+        # dynamic algo to find words of length n from words of length n-1
+        for _ in range(2, len(self.knots)+1):
+            largest_length_words = composable_admissible_words[-1]
+            new_words = [
+                word + [chord] for word in largest_length_words for chord in self.chords
+                if word[-1].is_composable_with(chord)]
+            # filter on admissibility
+            new_words = [word for word in new_words
+                         if max(Counter([c.top_line_segment.knot_label for c in word]).values()) == 1]
+            composable_admissible_words.append(new_words)
+        cyclic_composable_admissible_words = [
+            w for wl in range(len(composable_admissible_words))
+            for w in composable_admissible_words[wl]
+            if w[-1].is_composable_with(w[0])]
+        self.rsft_generators = [WordOfChords(word) for word in cyclic_composable_admissible_words]

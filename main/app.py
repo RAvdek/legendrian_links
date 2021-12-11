@@ -54,6 +54,13 @@ def get_template_context(plat_diagram, increment=50, pad=10):
             "to_knot": chord.top_line_segment.knot_label
         }
         for chord in plat_diagram.chords]
+    rsft_generators = [
+        {
+            "x_array": word.x_array,
+            "grading": word.grading
+        }
+        for word in plat_diagram.rsft_generators
+    ]
     template_context = {
         "pad": pad,
         "increment": increment,
@@ -73,6 +80,7 @@ def get_template_context(plat_diagram, increment=50, pad=10):
             for l in line_segments],
         'knots': knots,
         'chords': chords,
+        'rsft_generators': rsft_generators,
         'n_disks': len(disk_corners),
         'disk_corners': disk_corners,
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],

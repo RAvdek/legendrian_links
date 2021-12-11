@@ -22,10 +22,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Compute Z indices of pure chords.
-- Introduce t coordinate in differentials.
-- Gradings for cyclic words (of not necessarily chords) and put into table.
 - Process disks into differentials for LCH and RSFT with Z/2Z coefficients.
+- Introduce t coordinate in differentials.
 - Compute numbers of Z/2Z augmentations. Should be in a new module.
 - Process disks into differentials for LCH and RSFT with Z coefficients.
 - Ability to reverse orientations on link components.

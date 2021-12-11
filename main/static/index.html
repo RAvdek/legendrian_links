@@ -69,6 +69,21 @@ Chords by x-coordinate:
   {% endfor %}
 </table>
 <br><br>
+RSFT generators
+<br><br>
+<table>
+  <tr>
+    <th>Word of chords</th>
+    <th>Grading (Z/2Z)</th>
+  </tr>
+  {% for word in rsft_generators %}
+  <tr>
+    <td>{{ word["x_array"] }}</td>
+    <td>{{ word["grading"] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<br><br>
 A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
 {% for d in disk_corners %}
