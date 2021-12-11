@@ -1,4 +1,9 @@
 <!doctype html>
+<style>
+table, th, td {
+  border:1px solid black;
+}
+</style>
 <body>
 Lagrangian resolution of the plat:
 <br><br>
@@ -23,6 +28,46 @@ Lagrangian resolution of the plat:
     </text>
   {% endfor %}
 </svg>
+<br><br>
+Knots with classical invariants:
+<br><br>
+<table>
+  <tr>
+    <th>Label</th>
+    <th>Color</th>
+    <th>tb</th>
+    <th>rot</th>
+  </tr>
+  {% for knot in knots %}
+  <tr>
+    <td>{{ knot["label"] }}</td>
+    <td>
+      <svg width="14" height="14">
+        <circle cx="7" cy="7" r="7" fill="rgb({{ knot['rgb'][0] }},{{ knot['rgb'][1] }},{{ knot['rgb'][2] }})" />
+      </svg>
+    </td>
+    <td>{{ knot["tb"] }}</td>
+    <td>{{ knot["rot"] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<br><br>
+Chords by x-coordinate:
+<br><br>
+<table>
+  <tr>
+    <th>Chord</th>
+    <th>From knot</th>
+    <th>To knot</th>
+  </tr>
+  {% for chord in chords %}
+  <tr>
+    <td>{{ chord["x"] }}</td>
+    <td>{{ chord["from_knot"] }}</td>
+    <td>{{ chord["to_knot"] }}</td>
+  </tr>
+  {% endfor %}
+</table>
 <br><br>
 A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>

@@ -20,7 +20,24 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 # To do list
 
-- Compute rot and tb of knots.
-- Compute Z indices of chords and their cyclic words.
-- Process disks into differentials for LCH and RSFT.
-- Compute numbers of Z/2Z augmentations.
+## Features
+
+- Compute Z indices of pure chords.
+- Introduce t coordinate in differentials.
+- Gradings for cyclic words (of not necessarily chords) and put into table.
+- Process disks into differentials for LCH and RSFT with Z/2Z coefficients.
+- Compute numbers of Z/2Z augmentations. Should be in a new module.
+- Process disks into differentials for LCH and RSFT with Z coefficients.
+- Ability to reverse orientations on link components.
+- Compute differentials for 2-copies and twisted 2-copies.
+
+## Data sets
+
+- Port knots from the Legendrian knot atlas or other resource into `links.json`.
+- Get two component links from the link atlas.
+
+## Code cleanup
+
+- Add pylint or something to ensure code cleanliness.
+- Review relationships between data structures.
+- Make `legendrian_links` importable as a python library.

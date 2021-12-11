@@ -43,6 +43,17 @@ def get_template_context(plat_diagram, increment=50, pad=10):
     width = (increment * n_segments) + pad + increment
     line_segments = plat_diagram.get_line_segment_arrays()
     disk_corners = plat_diagram.disk_corners
+    knots = plat_diagram.knots
+    for k in range(len(knots)):
+        knots[k]["label"] = k
+        knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
+    chords = [
+        {
+            "x": chord.top_line_segment.x_left,
+            "from_knot": chord.bottom_line_segment.knot_label,
+            "to_knot": chord.top_line_segment.knot_label
+        }
+        for chord in plat_diagram.chords]
     template_context = {
         "pad": pad,
         "increment": increment,
@@ -60,6 +71,8 @@ def get_template_context(plat_diagram, increment=50, pad=10):
                 }
             }
             for l in line_segments],
+        'knots': knots,
+        'chords': chords,
         'n_disks': len(disk_corners),
         'disk_corners': disk_corners,
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],

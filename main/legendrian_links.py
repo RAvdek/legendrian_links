@@ -4,7 +4,7 @@ import utils
 LOG = utils.get_logger(__name__)
 
 
-class Crossing(object):
+class Chord(object):
     """Object which carries crossing information.
     Should be able to see the line segments at the positive and negative ends of a chord.
     From this we should be able to implement signs for holomorphic disks."""
@@ -13,6 +13,14 @@ class Crossing(object):
     def __init__(self, top_line_segment, bottom_line_segment):
         self.top_line_segment = top_line_segment
         self.bottom_line_segment = bottom_line_segment
+        self._set_sign()
+
+    def _set_sign(self):
+        if self.top_line_segment.orientation is None or self.bottom_line_segment.orientation is None:
+            raise ValueError(f"Trying to initialize crossing with unoriented line segments. "
+                             f"Top {self.top_line_segment.to_array()}, "
+                             f"bottom {self.bottom_line_segment.to_array()}")
+        self.sign = 1 if self.top_line_segment.orientation == self.bottom_line_segment.orientation else -1
 
 
 class DiskCorner(object):
@@ -248,7 +256,8 @@ class PlatSegment(object):
                 left_endpoints=[top_height, self.crossing_y + 1],
                 right_endpoints=[top_height, self.crossing_y]))
         # a crossing appears in all other cases
-        crossing = Crossing(
+        # TODO: This should find an existing crossing rather than create a new one
+        crossing = Chord(
             top_line_segment=self.top_line_segment_at_crossing,
             bottom_line_segment=self.bottom_line_segment_at_crossing)
         # with a crossing on the bottom
@@ -307,12 +316,16 @@ class LineSegment(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=None):
+    def __init__(self, n_strands, front_crossings=[]):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
 
         self._set_line_segments()
+        self.max_x_left = max([ls.x_left for ls in self.line_segments])
         self._label_line_segments()
+        # wait to set crossings until the line segments have been labeled
+        self._set_chords()
+        self._set_knots()
         self._set_plat_segments()
         self._set_disk_graph()
         self._set_disks()
@@ -323,9 +336,70 @@ class PlatDiagram(object):
     def get_line_segment_arrays(self):
         return [ls.to_array() + [ls.knot_label, ls.orientation] for ls in self.line_segments]
 
+    def get_line_segment_by_right_xy(self, x, y):
+        search_results = [ls for ls in self.line_segments if ls.x_right == x and ls.y_right == y]
+        n_results = len(search_results)
+        if n_results != 1:
+            raise RuntimeError(
+                f'Found {n_results} in search for line segment by right_xy, rather than 1 at x,y={x},{y}. '
+                f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
+        return search_results[0]
+
+    def get_line_segment_by_left_xy(self, x, y):
+        search_results = [ls for ls in self.line_segments if ls.x_left == x and ls.y_left == y]
+        n_results = len(search_results)
+        if n_results != 1:
+            raise RuntimeError(
+                f'Found {n_results} in search for line segment by left_xy, rather than 1 at x,y={x},{y}. '
+                f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
+        return search_results[0]
+
+    def get_next_line_segment(self, line_segment):
+        if line_segment.orientation == 'r':
+            if line_segment.x_left == self.max_x_left:
+                if line_segment.y_left > line_segment.y_right:
+                    return self.get_line_segment_by_left_xy(x=line_segment.x_left, y=line_segment.y_left - 1)
+                else:
+                    return self.get_line_segment_by_left_xy(x=line_segment.x_left, y=line_segment.y_left + 1)
+            else:
+                return self.get_line_segment_by_left_xy(x=line_segment.right_x, y=line_segment.right_y)
+        else:
+            if line_segment.x_left == 0:
+                if line_segment.y_left > line_segment.y_right:
+                    return self.get_line_segment_by_right_xy(x=line_segment.x_right, y=line_segment.y_right + 1)
+                else:
+                    return self.get_line_segment_by_right_xy(x=line_segment.x_right, y=line_segment.y_right - 1)
+            else:
+                return self.get_line_segment_by_right_xy(x=line_segment.left_x, y=line_segment.left_y)
+
+    def line_segment_is_incoming_to_left_up_cusp(self, line_segment):
+        if not (line_segment.x_left == 0 and line_segment.orientation == 'l'):
+            return False
+        next_ls = self.get_next_line_segment(line_segment)
+        return next_ls.y_right < line_segment.y_right
+
+    def line_segment_is_incoming_to_left_down_cusp(self, line_segment):
+        if not (line_segment.x_left == 0 and line_segment.orientation == 'l'):
+            return False
+        next_ls = self.get_next_line_segment(line_segment)
+        return next_ls.y_right > line_segment.y_right
+
+    def line_segment_is_incoming_to_right_up_cusp(self, line_segment):
+        if not (line_segment.x_left == self.max_x_left and line_segment.orientation == 'r'):
+            return False
+        next_ls = self.get_next_line_segment(line_segment)
+        return next_ls.y_left < line_segment.y_left
+
+    def line_segment_is_incoming_to_right_down_cusp(self, line_segment):
+        if not (line_segment.x_left == self.max_x_left and line_segment.orientation == 'r'):
+            return False
+        next_ls = self.get_next_line_segment(line_segment)
+        return next_ls.y_left > line_segment.y_left
 
     def _set_line_segments(self):
         lines = []
+        lag_crossings_from_right_cusps = [i for i in range(self.n_strands) if i % 2 == 0]
+        lag_crossings = self.front_crossings + lag_crossings_from_right_cusps
 
         # make the left closing part
         x = 0
@@ -334,9 +408,9 @@ class PlatDiagram(object):
                 lines.append(LineSegment(x_left=0, y_left=i + .5, x_right=1, y_right=i))
             else:
                 lines.append(LineSegment(x_left=0, y_left=i - .5, x_right=1, y_right=i))
-
-        if self.front_crossings is not None:
-            for fcy in self.front_crossings:
+        # make the segments at x values where there are crossings
+        if lag_crossings is not None:
+            for fcy in lag_crossings:
                 x += 1
                 for s in range(self.n_strands):
                     if s == fcy:
@@ -345,18 +419,6 @@ class PlatDiagram(object):
                         lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s - 1))
                     else:
                         lines.append(LineSegment(x_left=x, y_left=s, x_right=x + 1, y_right=s))
-
-        # make crossings for each of the right-pointing cusps
-        for i in [_ for _ in range(self.n_strands) if _ % 2 == 0]:
-            x += 1
-            for j in range(self.n_strands):
-                if j == i:
-                    lines.append(LineSegment(x_left=x, y_left=j, x_right=x + 1, y_right=j + 1))
-                elif j == i + 1:
-                    lines.append(LineSegment(x_left=x, y_left=j, x_right=x + 1, y_right=j - 1))
-                else:
-                    lines.append(LineSegment(x_left=x, y_left=j, x_right=x + 1, y_right=j))
-
         # make the right closing part
         x += 1
         for i in range(self.n_strands):
@@ -366,7 +428,6 @@ class PlatDiagram(object):
                 lines.append(LineSegment(x_left=x, y_left=i, x_right=x + 1, y_right=i - .5))
 
         self.line_segments = lines
-
 
     def _label_line_segments(self):
         knot_label = 0
@@ -388,6 +449,85 @@ class PlatDiagram(object):
                 n += 1
             knot_label += 1
         self.n_components = len(set([ls.knot_label for ls in self.line_segments]))
+
+    def _label_next_line_segment(self, ls):
+        if ls not in self.line_segments:
+            raise ValueError('line_segment does not belong to PlatDiagram instance')
+        if ls.orientation is None:
+            raise ValueError('Cannot find next line segment if it is not orientated')
+        if ls.knot_label is None:
+            raise ValueError('Cannot find knot_label for line_segment')
+
+        max_x_right = self.max_x_left + 1
+        if ls.orientation == 'r':
+            if ls.x_right < max_x_right:
+                next_ls = self.get_line_segment_by_left_xy(x=ls.x_right, y=ls.y_right)
+                next_ls.set_orientation('r')
+            else:
+                if ls.y_right < ls.y_left:
+                    next_ls = self.get_line_segment_by_left_xy(x=ls.x_left, y=ls.y_left - 1)
+                else:
+                    next_ls = self.get_line_segment_by_left_xy(x=ls.x_left, y=ls.y_left + 1)
+                next_ls.set_orientation('l')
+        else:
+            if ls.x_left > 0:
+                next_ls = self.get_line_segment_by_right_xy(x=ls.x_left, y=ls.y_left)
+                next_ls.set_orientation('l')
+            else:
+                if ls.y_right < ls.y_left:
+                    next_ls = self.get_line_segment_by_right_xy(x=ls.x_right, y=ls.y_right + 1)
+                else:
+                    next_ls = self.get_line_segment_by_right_xy(x=ls.x_right, y=ls.y_right - 1)
+                next_ls.set_orientation('r')
+
+        next_ls.set_knot_label(ls.knot_label)
+        return next_ls
+
+    def _set_chords(self):
+        chords = []
+        for x in range(0, self.max_x_left):
+            x_segments = [ls for ls in self.line_segments if ls.x_left == x]
+            for y in range(self.n_strands - 1):
+                if x == 0:
+                    top_left_ls = [ls for ls in x_segments if ls.y_right == y][0]
+                    bottom_left_ls = [ls for ls in x_segments if ls.y_right == y + 1][0]
+                else:
+                    top_left_ls = [ls for ls in x_segments if ls.y_left == y][0]
+                    bottom_left_ls = [ls for ls in x_segments if ls.y_left == y + 1][0]
+                are_crossing = (top_left_ls.y_right == y + 1) and (bottom_left_ls.y_right == y)
+                if are_crossing:
+                    chords.append(Chord(top_line_segment=top_left_ls, bottom_line_segment=bottom_left_ls))
+        self.chords = chords
+
+    def _set_knots(self):
+        knot_labels = sorted(list(set([ls.knot_label for ls in self.line_segments])))
+        knots = list()
+        for kl in knot_labels:
+            knot_line_segments = [ls for ls in self.line_segments if ls.knot_label == kl]
+            # compute tb as writhe in the Lagrangian projection
+            self_chords = [c for c in self.chords
+                           if c.top_line_segment.knot_label == kl and c.bottom_line_segment.knot_label == kl]
+            tb = sum([c.sign for c in self_chords])
+            # compute rot from the left and right cusps
+            rot = 0
+            for ls in knot_line_segments:
+                if self.line_segment_is_incoming_to_left_down_cusp(ls):
+                    rot += 1
+                if self.line_segment_is_incoming_to_right_up_cusp(ls):
+                    rot += 1
+                if self.line_segment_is_incoming_to_left_up_cusp(ls):
+                    rot -= 1
+                if self.line_segment_is_incoming_to_right_down_cusp(ls):
+                    rot -= 1
+            rot = rot // 2
+
+            knots.append({
+                'line_segments': knot_line_segments,
+                'tb': tb,
+                'rot': rot
+            })
+
+        self.knots = knots
 
     def _set_plat_segments(self):
         max_left_x = max([ls.x_left for ls in self.line_segments])
@@ -415,60 +555,5 @@ class PlatDiagram(object):
     def _set_disks(self):
         self.disks = self.disk_graph.compute_disks()
 
-
     def _set_disk_corners(self):
         self.disk_corners = [d.get_disk_corners() for d in self.disks]
-
-
-    def get_line_segment_by_right_xy(self, x, y):
-        search_results = [ls for ls in self.line_segments if ls.x_right == x and ls.y_right == y]
-        n_results = len(search_results)
-        if n_results != 1:
-            raise RuntimeError(
-                f'Found {n_results} in search for line segment by right_xy, rather than 1 at x,y={x},{y}. '
-                f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
-        return search_results[0]
-
-
-    def get_line_segment_by_left_xy(self, x, y):
-        search_results = [ls for ls in self.line_segments if ls.x_left == x and ls.y_left == y]
-        n_results = len(search_results)
-        if n_results != 1:
-            raise RuntimeError(
-                f'Found {n_results} in search for line segment by left_xy, rather than 1 at x,y={x},{y}. '
-                f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
-        return search_results[0]
-
-
-    def _label_next_line_segment(self, ls):
-        if ls not in self.line_segments:
-            raise ValueError('line_segment does not belong to PlatDiagram instance')
-        if ls.orientation is None:
-            raise ValueError('Cannot find next line segment if it is not orientated')
-        if ls.knot_label is None:
-            raise ValueError('Cannot find knot_label for line_segment')
-
-        max_x_right = max([ls.x_right for ls in self.line_segments])
-        if ls.orientation == 'r':
-            if ls.x_right < max_x_right:
-                next_ls = self.get_line_segment_by_left_xy(x=ls.x_right, y=ls.y_right)
-                next_ls.set_orientation('r')
-            else:
-                if ls.y_right < ls.y_left:
-                    next_ls = self.get_line_segment_by_left_xy(x=ls.x_left, y=ls.y_left - 1)
-                else:
-                    next_ls = self.get_line_segment_by_left_xy(x=ls.x_left, y=ls.y_left + 1)
-                next_ls.set_orientation('l')
-        else:
-            if ls.x_left > 0:
-                next_ls = self.get_line_segment_by_right_xy(x=ls.x_left, y=ls.y_left)
-                next_ls.set_orientation('l')
-            else:
-                if ls.y_right < ls.y_left:
-                    next_ls = self.get_line_segment_by_right_xy(x=ls.x_right, y=ls.y_right + 1)
-                else:
-                    next_ls = self.get_line_segment_by_right_xy(x=ls.x_right, y=ls.y_right - 1)
-                next_ls.set_orientation('r')
-
-        next_ls.set_knot_label(ls.knot_label)
-        return next_ls
