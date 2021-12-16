@@ -52,19 +52,23 @@ Knots with classical invariants:
   {% endfor %}
 </table>
 <br><br>
-Chords by x-coordinate:
+Products of chords as lists of their x-coordinate (empty chord = unit = "[]"):
 <br><br>
 <table>
   <tr>
     <th>Chord</th>
+    <th>Grading (Z/2Z)</th>
     <th>From knot</th>
     <th>To knot</th>
+    <th>LCH del</th>
   </tr>
   {% for chord in chords %}
   <tr>
-    <td>{{ chord["x"] }}</td>
+    <td>{{ chord["string"] }}</td>
+    <td>{{ chord["grading"] }}</td>
     <td>{{ chord["from_knot"] }}</td>
     <td>{{ chord["to_knot"] }}</td>
+    <td>{{ chord["lch_del"] }}</td>
   </tr>
   {% endfor %}
 </table>
@@ -78,7 +82,7 @@ RSFT generators
   </tr>
   {% for word in rsft_generators %}
   <tr>
-    <td>{{ word["x_array"] }}</td>
+    <td>{{ word["string"] }}</td>
     <td>{{ word["grading"] }}</td>
   </tr>
   {% endfor %}
@@ -88,7 +92,7 @@ A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
 {% for d in disk_corners %}
   {% for c in d %}
-    {{c.crossing.top_line_segment.x_left}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}
+    {{c.chord.top_line_segment.x_left}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}
   {% endfor %}<br>
 {% endfor %}
 </body>

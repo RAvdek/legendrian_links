@@ -20,7 +20,7 @@ class TestLinks(unittest.TestCase):
 
         # The x-values of disk segments in each disk are all distinct
         for d in pd.disks:
-            ds_x_values = [ds.x for ds in d]
+            ds_x_values = [ds.x for ds in d.disk_segments]
             self.assertEqual(len(ds_x_values), len(set(ds_x_values)))
 
         # tb and rot

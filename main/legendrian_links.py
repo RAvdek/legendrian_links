@@ -14,7 +14,19 @@ class Chord(object):
     def __init__(self, top_line_segment, bottom_line_segment):
         self.top_line_segment = top_line_segment
         self.bottom_line_segment = bottom_line_segment
+        self._set_xy()
         self._set_sign()
+        self._set_grading()
+
+    def to_string(self):
+        return f"[{self.x}]"
+
+    def is_composable_with(self, chord):
+        return self.top_line_segment.knot_label == chord.bottom_line_segment.knot_label
+
+    def _set_xy(self):
+        self.x = self.top_line_segment.x_left
+        self.y = self.top_line_segment.y_left
 
     def _set_sign(self):
         if self.top_line_segment.orientation is None or self.bottom_line_segment.orientation is None:
@@ -23,16 +35,22 @@ class Chord(object):
                              f"bottom {self.bottom_line_segment.to_array()}")
         self.sign = 1 if self.top_line_segment.orientation == self.bottom_line_segment.orientation else -1
 
-    def is_composable_with(self, chord):
-        return self.top_line_segment.knot_label == chord.bottom_line_segment.knot_label
+    def _set_grading(self):
+        self.grading = 1 if self.sign == -1 else 0
 
 
 class WordOfChords(object):
 
     def __init__(self, word):
+        for chord in word:
+            if not isinstance(chord, Chord):
+                raise ValueError("Trying to create WordOfChord object not from a list of chords")
         self.word = word
         self._set_grading()
         self._set_x_array()
+
+    def to_string(self):
+        return "[" + ",".join([str(chord.x) for chord in self.word]) + "]"
 
     def _set_grading(self):
         self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
@@ -50,24 +68,28 @@ class DiskCorner(object):
         'd': '-'
     }
 
-    def __init__(self, crossing, corner):
-        self.crossing = crossing
+    def __init__(self, chord, corner):
+        self.chord = chord
         if corner not in self.CORNER_TYPES.keys():
             raise ValueError(f"Incoming type {corner} not in {self.CORNER_TYPES}")
         self.corner = corner
+        self.pos_neg = self.CORNER_TYPES[self.corner]
 
     def to_dict(self):
         return {
-            'x': self.crossing.top_line_segment.x_left,
-            'y': self.crossing.top_line_segment.y_left,
-            'from_knot': self.crossing.bottom_line_segment.knot_label,
-            'to_knot': self.crossing.top_line_segment.knot_label,
+            'x': self.chord.top_line_segment.x_left,
+            'y': self.chord.top_line_segment.y_left,
+            'from_knot': self.chord.bottom_line_segment.knot_label,
+            'to_knot': self.chord.top_line_segment.knot_label,
             'corner': self.corner,
-            'pos_neg': self.CORNER_TYPES[self.corner]
+            'pos_neg': self.pos_neg
         }
 
 
 class DiskSegment(object):
+    # TODO: rather than having left and right endpoints, it might be easier to have left_top,
+    #  left_bottom, right_top, right_bottom line segments. Current implementation is a hack.
+
     def __init__(self, x, disk_corner, left_endpoints=None, right_endpoints=None):
         self.x = x
         self.disk_corner = disk_corner
@@ -157,62 +179,49 @@ class DiskSegmentGraph(object):
         return [self.path_to_disk(p) for p in paths]
 
 
-class Disk(list):
+class Disk(object):
     """A disk is a list of disk segments such that the right endpoints of one segment
     agree with the left endpoints of the next. This is supposed to model an index 1
     J-disk in the Lagrangian projection determined by a Lagrangian resolution."""
 
-    def get_endpoints(self):
-        return [ds.get_endpoints() for ds in self]
+    def __init__(self, disk_segments):
+        self.disk_segments = disk_segments
+        self._set_disk_corners()
 
-    def get_disk_corners(self):
+    def get_endpoints(self):
+        return [ds.get_endpoints() for ds in self.disk_segments]
+
+    def _set_disk_corners(self):
         disk_corners = []
-        for ds in self:
+        disk_segments = self.disk_segments
+        for ds in disk_segments:
             if ds.disk_corner is not None:
                 if ds.disk_corner.corner in ['l', 'd']:
                     disk_corners.append(ds.disk_corner)
-        for ds in reversed(self):
+        for ds in reversed(disk_segments):
             if ds.disk_corner is not None:
                 if ds.disk_corner.corner in ['u', 'r']:
                     disk_corners.append(ds.disk_corner)
-        return disk_corners
+        self.disk_corners = disk_corners
+        self.pos_corners = [c for c in self.disk_corners if c.pos_neg == '+']
+        self.neg_corners = [c for c in self.disk_corners if c.pos_neg == '-']
+
+    def is_lch(self):
+        return len(self.pos_corners) == 1
+
+    def is_rsft(self):
+        raise NotImplementedError()
 
 
 class PlatSegment(object):
 
-    def __init__(self, line_segments, left_close=False, right_close=False):
+    def __init__(self, line_segments, chord=None, left_close=False, right_close=False):
         self.line_segments = line_segments
+        self.chord = chord
         self.n_strands = len(line_segments)
         self.left_close = left_close
         self.right_close = right_close
-        self._set_x()
-        self._set_crossing_data()
-
-    def _set_x(self):
-        x_left_values = list(set([ls.x_left for ls in self.line_segments]))
-        n_x_left_values = len(x_left_values)
-        if n_x_left_values > 1:
-            raise ValueError(f"Found {n_x_left_values} different left x values for line segments in PlatSegment")
-        self.x = x_left_values[0]
-
-    def _set_crossing_data(self):
-        if self.left_close or self.right_close:
-            self.crossing_y = None
-            self.top_line_segment_at_crossing = None
-            self.bottom_line_segment_at_crossing = None
-        else:
-            southeast_segments = [ls for ls in self.line_segments if ls.y_left < ls.y_right]
-            n_southeast_segments = len(southeast_segments)
-            northeast_segments = [ls for ls in self.line_segments if ls.y_left > ls.y_right]
-            n_northeast_segments = len(northeast_segments)
-            if n_southeast_segments != 1 or n_northeast_segments != 1:
-                raise ValueError(f"Trying to initialize PlatSegment at x={self.x} with "
-                                 f"{n_southeast_segments} NE segments and "
-                                 f"{n_northeast_segments} NE segments. "
-                                 f"Line segments: {[ls.to_array() for ls in self.line_segments]}")
-            self.crossing_y = southeast_segments[0].y_left
-            self.top_line_segment_at_crossing = southeast_segments[0]
-            self.bottom_line_segment_at_crossing = northeast_segments[0]
+        self._set_xy()
 
     def to_dict(self):
         return {
@@ -276,15 +285,12 @@ class PlatSegment(object):
                 left_endpoints=[top_height, self.crossing_y + 1],
                 right_endpoints=[top_height, self.crossing_y]))
         # a crossing appears in all other cases
-        # TODO: This should find an existing crossing rather than create a new one
-        crossing = Chord(
-            top_line_segment=self.top_line_segment_at_crossing,
-            bottom_line_segment=self.bottom_line_segment_at_crossing)
+        chord = self.chord
         # with a crossing on the bottom
         for top_height in range(0, self.crossing_y):
             disk_segments.append(DiskSegment(
                 x=self.x,
-                disk_corner=DiskCorner(crossing=crossing, corner='d'),
+                disk_corner=DiskCorner(chord=chord, corner='d'),
                 left_endpoints=[top_height, self.crossing_y],
                 right_endpoints=[top_height, self.crossing_y]
             ))
@@ -292,23 +298,33 @@ class PlatSegment(object):
         for top_height in range(self.crossing_y + 1, self.n_strands):
             disk_segments.append(DiskSegment(
                 x=self.x,
-                disk_corner=DiskCorner(crossing=crossing, corner='u'),
+                disk_corner=DiskCorner(chord=chord, corner='u'),
                 left_endpoints=[self.crossing_y + 1, top_height],
                 right_endpoints=[self.crossing_y + 1, top_height],
             ))
         # with a crossing on the left
         disk_segments.append(DiskSegment(
             x=self.x,
-            disk_corner=DiskCorner(crossing=crossing, corner='l'),
+            disk_corner=DiskCorner(chord=chord, corner='l'),
             right_endpoints=[self.crossing_y, self.crossing_y + 1],
         ))
         # with a crossing on the right
         disk_segments.append(DiskSegment(
             x=self.x,
-            disk_corner=DiskCorner(crossing=crossing, corner='r'),
+            disk_corner=DiskCorner(chord=chord, corner='r'),
             left_endpoints=[self.crossing_y, self.crossing_y + 1],
         ))
         return disk_segments
+
+    def _set_xy(self):
+        x_left_values = list(set([ls.x_left for ls in self.line_segments]))
+        n_x_left_values = len(x_left_values)
+        if n_x_left_values > 1:
+            raise ValueError(f"Found {n_x_left_values} different left x values for line segments in PlatSegment")
+        self.x = x_left_values[0]
+        self.crossing_y = None
+        if self.chord is not None:
+            self.crossing_y = self.chord.top_line_segment.y_left
 
 
 class LineSegment(object):
@@ -352,6 +368,7 @@ class PlatDiagram(object):
         LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self._set_disk_corners()
         self._set_lch_generators()
+        self._set_lch_del()
         self._set_rsft_generators()
 
     def get_line_segment_arrays(self):
@@ -557,7 +574,12 @@ class PlatDiagram(object):
             left_x_segments = [ls for ls in self.line_segments if ls.x_left == x]
             left_close = x == 0
             right_close = x == max_left_x
-            ps = PlatSegment(left_x_segments, left_close=left_close, right_close=right_close)
+            chords = [c for c in self.chords
+                      if c.bottom_line_segment in left_x_segments or c.top_line_segment in left_x_segments]
+            if len(chords) > 1:
+                raise ValueError(f'More than 1 chord at a plat segment')
+            chord = chords[0] if len(chords) == 1 else None
+            ps = PlatSegment(left_x_segments, chord = chord, left_close=left_close, right_close=right_close)
             plat_segments.append(ps)
         self.plat_segments = plat_segments
 
@@ -577,10 +599,24 @@ class PlatDiagram(object):
         self.disks = self.disk_graph.compute_disks()
 
     def _set_disk_corners(self):
-        self.disk_corners = [d.get_disk_corners() for d in self.disks]
+        self.disk_corners = [d.disk_corners for d in self.disks]
 
     def _set_lch_generators(self):
-        self.lch_generators = [WordOfChords([chord]) for chord in self.chords]
+        self.lch_generators = self.chords
+
+    def _set_lch_del(self):
+        lch_disks = [d for d in self.disks if d.is_lch()]
+        lch_del = {g: list() for g in self.lch_generators}
+        for d in lch_disks:
+            disk_corners = d.disk_corners.copy()
+            # cyclically rotate disk until positive corner is in the last (-1) position
+            while disk_corners[-1].pos_neg == '-':
+                last_corner = disk_corners.pop(-1)
+                disk_corners = [last_corner] + disk_corners
+            pos_chord = disk_corners.pop().chord
+            neg_chords = WordOfChords(word=[dc.chord for dc in disk_corners])
+            lch_del[pos_chord].append(neg_chords)
+        self.lch_del = lch_del
 
     def _set_rsft_generators(self):
         # length 1 composable words

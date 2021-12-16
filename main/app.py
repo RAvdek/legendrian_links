@@ -49,14 +49,16 @@ def get_template_context(plat_diagram, increment=50, pad=10):
         knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
     chords = [
         {
-            "x": chord.top_line_segment.x_left,
+            "string": chord.to_string(),
+            "grading": str(chord.grading),
             "from_knot": chord.bottom_line_segment.knot_label,
-            "to_knot": chord.top_line_segment.knot_label
+            "to_knot": chord.top_line_segment.knot_label,
+            "lch_del": " + ".join(word.to_string() for word in plat_diagram.lch_del[chord])
         }
         for chord in plat_diagram.chords]
     rsft_generators = [
         {
-            "x_array": word.x_array,
+            "string": word.to_string(),
             "grading": word.grading
         }
         for word in plat_diagram.rsft_generators
