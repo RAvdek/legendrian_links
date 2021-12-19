@@ -168,7 +168,6 @@ class DiskSegmentGraph(object):
             if self.vertex_is_initial(i):
                 paths += self.compute_paths_from_vertex(i)
         paths = [p for p in paths if self.vertex_is_terminal(p[-1])]
-        LOG.info(f"DG paths: {paths}")
         return paths
 
     def path_to_disk(self, index_path):
@@ -337,6 +336,7 @@ class LineSegment(object):
         self.y_right = y_right
         self.orientation = None
         self.knot_label = None
+        self.t_label = False
 
     def to_array(self):
         return [[self.x_left, self.y_left], [self.x_right, self.y_right]]
@@ -345,6 +345,9 @@ class LineSegment(object):
         if o not in self.ORIENTATIONS:
             raise ValueError(f'LineSegment orientation must be in {self.ORIENTATIONS}')
         self.orientation = o
+
+    def toggle_t_label(self):
+        self.t_label = not self.t_label
 
     def set_knot_label(self, kl):
         self.knot_label = kl
@@ -365,14 +368,20 @@ class PlatDiagram(object):
         self._set_plat_segments()
         self._set_disk_graph()
         self._set_disks()
-        LOG.info(f"Disks in plat diagram: {len(self.disks)}")
         self._set_disk_corners()
         self._set_lch_generators()
         self._set_lch_del()
         self._set_rsft_generators()
 
-    def get_line_segment_arrays(self):
-        return [ls.to_array() + [ls.knot_label, ls.orientation] for ls in self.line_segments]
+    def get_line_segment_array(self):
+        return [
+            {
+                'array': ls.to_array(),
+                'knot_label': ls.knot_label,
+                'orientation': ls.orientation,
+                't_label': ls.t_label
+            }
+            for ls in self.line_segments]
 
     def get_line_segment_by_right_xy(self, x, y):
         search_results = [ls for ls in self.line_segments if ls.x_right == x and ls.y_right == y]
@@ -474,7 +483,6 @@ class PlatDiagram(object):
         while True:
             unlabeled_line_segments = [ls for ls in self.line_segments if ls.knot_label is None]
             n_unlabeled_line_segments = len(unlabeled_line_segments)
-            LOG.info(f"{n_unlabeled_line_segments} line segments unlabeled")
             if n_unlabeled_line_segments == 0:
                 break
             initial_ls = unlabeled_line_segments[0]
@@ -482,11 +490,14 @@ class PlatDiagram(object):
             initial_ls.set_orientation('r')
             ls = self._label_next_line_segment(initial_ls)
             while ls != initial_ls:
-                LOG.info(ls.to_array())
                 ls = self._label_next_line_segment(ls)
                 n += 1
             knot_label += 1
         self.n_components = len(set([ls.knot_label for ls in self.line_segments]))
+        # add a t label to exactly one line segment in each component of the link
+        for knot_label in range(self.n_components):
+            knot = [ls for ls in self.line_segments if ls.knot_label == knot_label]
+            knot[0].toggle_t_label()
 
     def _label_next_line_segment(self, ls):
         if ls not in self.line_segments:
@@ -591,8 +602,6 @@ class PlatDiagram(object):
             for d in disk_segments:
                 disk_graph.add_vertex(d)
         disk_graph.compute_edges()
-        LOG.info(f"{len(disk_graph.vertices)} disk_graph vertices")
-        LOG.info(f"{len(disk_graph.edges)} disk_graph edges")
         self.disk_graph = disk_graph
 
     def _set_disks(self):

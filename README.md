@@ -22,8 +22,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Process disks into differentials for LCH and RSFT with Z/2Z coefficients.
 - Introduce t coordinate in differentials.
+- Process disks into differentials for RSFT with Z/2Z coefficients and grading.
 - Compute numbers of Z/2Z augmentations. Should be in a new module.
 - Process disks into differentials for LCH and RSFT with Z coefficients.
 - Ability to reverse orientations on link components.

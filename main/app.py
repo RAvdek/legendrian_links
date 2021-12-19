@@ -41,7 +41,7 @@ def get_template_context(plat_diagram, increment=50, pad=10):
     n_segments = len(plat_diagram.plat_segments)
     height = increment * plat_diagram.n_strands + pad
     width = (increment * n_segments) + pad + increment
-    line_segments = plat_diagram.get_line_segment_arrays()
+    line_segments = plat_diagram.get_line_segment_array()
     disk_corners = plat_diagram.disk_corners
     knots = plat_diagram.knots
     for k in range(len(knots)):
@@ -70,16 +70,18 @@ def get_template_context(plat_diagram, increment=50, pad=10):
         "width": width,
         "lines": [
             {
-                'start_xy': [increment + pad + int(increment * l[0][0]), pad + int(increment * l[0][1])],
-                'end_xy': [increment + pad + int(increment * l[1][0]), pad + int(increment * l[1][1])],
-                'rgb': KNOT_COLORS[l[2] % len(KNOT_COLORS)],
+                'start_xy': [
+                    increment + pad + int(increment * ls['array'][0][0]), pad + int(increment * ls['array'][0][1])],
+                'end_xy': [
+                    increment + pad + int(increment * ls['array'][1][0]), pad + int(increment * ls['array'][1][1])],
+                'rgb': KNOT_COLORS[ls['knot_label'] % len(KNOT_COLORS)],
                 'label': {
-                    'x': increment + pad + int(increment * (l[0][0] + l[1][0]) / 2),
-                    'y': pad + int(increment * (l[0][1] + l[1][1]) / 2),
-                    'marker': KNOT_ORIENTATIONS_TO_ARROW[l[3]]
+                    'x': increment + pad + int(increment * (ls['array'][0][0] + ls['array'][1][0]) / 2),
+                    'y': pad + int(increment * (ls['array'][0][1] + ls['array'][1][1]) / 2),
+                    'marker': 'T' if ls['t_label'] else KNOT_ORIENTATIONS_TO_ARROW[ls['orientation']]
                 }
             }
-            for l in line_segments],
+            for ls in line_segments],
         'knots': knots,
         'chords': chords,
         'rsft_generators': rsft_generators,

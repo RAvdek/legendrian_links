@@ -18,6 +18,11 @@ class TestLinks(unittest.TestCase):
         self.assertEqual(len(pd.chords), len(front_crossings) + (n_strands // 2))
         self.assertEqual(len(pd.disks), n_disks)
 
+        # There is exactly one t_label for each component of the link
+        for knot in pd.knots:
+            t_labeled_segments = [ls for ls in knot['line_segments'] if ls.t_label]
+            self.assertTrue(len(t_labeled_segments), 1)
+
         # The x-values of disk segments in each disk are all distinct
         for d in pd.disks:
             ds_x_values = [ds.x for ds in d.disk_segments]
