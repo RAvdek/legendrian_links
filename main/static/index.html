@@ -52,12 +52,12 @@ Knots with classical invariants:
   {% endfor %}
 </table>
 <br><br>
-Products of chords as lists of their x-coordinate (empty chord = unit = "[]"):
+Products of chords as lists of their x-coordinate:
 <br><br>
 <table>
   <tr>
     <th>Chord</th>
-    <th>Grading (Z/2Z)</th>
+    <th>Grading ({{ lch_graded_by }})</th>
     <th>From knot</th>
     <th>To knot</th>
     <th>LCH del</th>
@@ -65,7 +65,7 @@ Products of chords as lists of their x-coordinate (empty chord = unit = "[]"):
   {% for chord in chords %}
   <tr>
     <td>{{ chord["string"] }}</td>
-    <td>{{ chord["Z2_grading"] }}</td>
+    <td>{{ chord["grading"] }}</td>
     <td>{{ chord["from_knot"] }}</td>
     <td>{{ chord["to_knot"] }}</td>
     <td>{{ chord["lch_del"] }}</td>
@@ -78,12 +78,12 @@ RSFT generators
 <table>
   <tr>
     <th>Word of chords</th>
-    <th>Grading (Z/2Z)</th>
+    <th>Grading ({{ rsft_graded_by }})</th>
   </tr>
   {% for word in rsft_generators %}
   <tr>
     <td>{{ word["string"] }}</td>
-    <td>{{ word["Z2_grading"] }}</td>
+    <td>{{ word["grading"] }}</td>
   </tr>
   {% endfor %}
 </table>

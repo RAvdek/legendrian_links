@@ -1,8 +1,19 @@
 from collections import Counter
+import math
+import sympy
 import utils
 
 
 LOG = utils.get_logger(__name__)
+ZZ = sympy.ZZ
+ZZ2 = sympy.GF(2)
+HALF = sympy.Rational(1, 2)
+QUARTER = sympy.Rational(1, 4)
+
+
+def graded_by_valid_or_except(graded_by):
+    if not (graded_by.is_ZZ or (graded_by.is_FiniteField and graded_by.mod == 2)):
+        raise ValueError(f"Generator must be graded by Z or Z2. Graded by {str(graded_by)}")
 
 
 class Chord(object):
@@ -16,7 +27,6 @@ class Chord(object):
         self.bottom_line_segment = bottom_line_segment
         self._set_xy()
         self._set_sign()
-        self._set_z2_grading()
 
     def to_string(self):
         return f"[{self.x}]"
@@ -35,28 +45,62 @@ class Chord(object):
                              f"bottom {self.bottom_line_segment.to_array()}")
         self.sign = 1 if self.top_line_segment.orientation == self.bottom_line_segment.orientation else -1
 
-    def _set_z2_grading(self):
-        self.z2_grading = 1 if self.sign == -1 else 0
+
+class LCHGenerator(object):
+
+    def __init__(self, chord, graded_by, capping_path=None):
+        self.chord = chord
+        self.capping_path = capping_path
+        graded_by_valid_or_except(graded_by)
+        self.graded_by = graded_by
+        self._set_grading()
+        self._set_string()
+        self._set_symbol()
+
+    def _set_grading(self):
+        if self.graded_by.is_ZZ:
+            maslov = self.capping_path.rotation_number - HALF
+            self.grading = maslov
+        else:
+            self.grading = 0 if self.chord.sign == 1 else 1
+
+    def _set_string(self):
+        self.string = f"[{str(self.chord.x)}]"
+
+    def _set_symbol(self):
+        self.symbol = sympy.Symbol(self.string)
 
 
-class WordOfChords(object):
+class RSFTGenerator(object):
 
-    def __init__(self, word):
+    def __init__(self, word, graded_by, capping_paths=None):
         for chord in word:
             if not isinstance(chord, Chord):
                 raise ValueError("Trying to create WordOfChord object not from a list of chords")
         self.word = word
-        self._set_z2_grading()
-        self._set_x_array()
+        graded_by_valid_or_except(graded_by)
+        self.capping_paths = capping_paths
+        if graded_by.is_ZZ:
+            if capping_paths is None:
+                raise ValueError(f"Z graded RSFT generators need capping paths.")
+            if len(capping_paths) != len(word):
+                raise ValueError(f"len(capping_paths) = {len(capping_paths)} != len(word) = {len(word)}")
+        self.graded_by = graded_by
+        self._set_grading()
+        self._set_string()
+        self._set_symbol()
 
-    def to_string(self):
-        return "[" + ",".join([str(chord.x) for chord in self.word]) + "]"
+    def _set_grading(self):
+        if self.graded_by.is_ZZ:
+            self.grading = -1 + HALF*len(self.word) + sum([path.rotation_number for path in self.capping_paths])
+        else:
+            self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
 
-    def _set_z2_grading(self):
-        self.z2_grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
+    def _set_string(self):
+        self.string = "[" + ",".join([str(chord.x) for chord in self.word]) + "]"
 
-    def _set_x_array(self):
-        self.x_array = [chord.bottom_line_segment.x_left for chord in self.word]
+    def _set_symbol(self):
+        self.symbol = sympy.Symbol(self.string)
 
 
 class DiskCorner(object):
@@ -101,8 +145,14 @@ class DiskSegment(object):
         self._set_y_values()
 
     def _set_y_values(self):
-        self.left_y_values = [getattr(self.top_left_ls, 'y_left', None), getattr(self.bottom_left_ls, 'y_left', None)]
-        self.right_y_values = [getattr(self.top_right_ls, 'y_right', None), getattr(self.bottom_right_ls, 'y_right', None)]
+        self.left_y_values = [
+            getattr(self.top_left_ls, 'y_left', None),
+            getattr(self.bottom_left_ls, 'y_left', None)
+        ]
+        self.right_y_values = [
+            getattr(self.top_right_ls, 'y_right', None),
+            getattr(self.bottom_right_ls, 'y_right', None)
+        ]
 
     def to_dict(self):
         output = dict()
@@ -163,7 +213,7 @@ class DiskSegmentGraph(object):
         return [[i] + p for v in outgoing_vertices for p in self.compute_paths_from_vertex(v)]
 
     def compute_paths(self):
-        # TODO: Divide and conquer is suboptimal. Can instead use dynamic which is faster.
+        # TODO: Divide and conquer is suboptimal. Can instead use dynamic algo which is faster.
         # This may actually be important for very large numbers of disks.
         paths = []
         for i in range(len(self.vertices)):
@@ -365,6 +415,58 @@ class LineSegment(object):
         self.knot_label = kl
 
 
+class CappingPath(object):
+    """Records capping path starting at the top endpoint of start_chord and ending at the initial point of end_chord.
+    CappingPath's always follow orientation of the knot in which they're contained.
+    Rotation numbers are computed assuming that all .
+    """
+
+    def __init__(self, start_chord, end_chord, line_segments):
+        self.start_chord = start_chord
+        self.end_chord = end_chord
+        self.line_segments = line_segments
+        self._set_touches_basepoint()
+        self._set_rotation_number()
+
+    def _set_touches_basepoint(self):
+        self.touches_basepoint = any([segment.t_label for segment in self.line_segments])
+
+    def _set_rotation_number(self):
+        """Rotation numbers will be multiples of one half.
+        Stored as sympy.Rational to avoid float issues"""
+        switches = [
+            (self.line_segments[i], self.line_segments[i+1])
+            for i in range(len(self.line_segments) - 1)
+            if self.line_segments[i].orientation != self.line_segments[i+1].orientation
+        ]
+        rotation_number = sympy.Rational(0, 1)
+        # plus number of upward right-to-left switches
+        rotation_number += len([
+            s for s in switches
+            if s[0].orientation == 'r' and s[0].x_left > s[1].x_left
+        ])
+        # minus number of downward right-to-left switches
+        rotation_number -= len([
+            s for s in switches
+            if s[0].orientation == 'r' and s[0].x_left < s[1].x_left
+        ])
+        # minus number of upward left-to-right switches
+        rotation_number -= len([
+            s for s in switches
+            if s[0].orientation == 'l' and s[0].x_left > s[1].x_left
+        ])
+        # plus number of downward left-to-right switches
+        rotation_number += len([
+            s for s in switches
+            if s[0].orientation == 'l' and s[0].x_left < s[1].x_left
+        ])
+        # add quarter rotations to start and end
+
+        rotation_number += QUARTER if self.line_segments[0].orientation == 'l' else -QUARTER
+        rotation_number += QUARTER if self.line_segments[-1].orientation == 'r' else -QUARTER
+        self.rotation_number = rotation_number
+
+
 class PlatDiagram(object):
 
     def __init__(self, n_strands, front_crossings=[]):
@@ -377,6 +479,8 @@ class PlatDiagram(object):
         # wait to set crossings until the line segments have been labeled
         self._set_chords()
         self._set_knots()
+        self._set_lch_graded_by()
+        self._set_rsft_graded_by()
         self._set_composable_pairs()
         self._set_capping_paths()
         self._set_plat_segments()
@@ -459,6 +563,22 @@ class PlatDiagram(object):
             return False
         next_ls = self.get_next_line_segment(line_segment)
         return next_ls.y_left > line_segment.y_left
+
+    def get_capping_path(self, start_chord, end_chord):
+        search_results = [p for p in self.capping_paths if p.start_chord == start_chord and p.end_chord == end_chord]
+        n_results = len(search_results)
+        if n_results != 1:
+            raise RuntimeError(f"Found {n_results} possible capping paths for"
+                               f"start_chord={start_chord.to_string()} and"
+                               f"end_chord={end_chord.to_string()}")
+        return search_results[0]
+
+    def get_lch_generator_from_chord(self, chord):
+        search_results = [g for g in self.lch_generators if g.chord == chord]
+        n_results = len(search_results)
+        if n_results != 1:
+            raise RuntimeError(f"Found {n_results} possible LCH generators for chord {chord.to_string()}")
+        return search_results[0]
 
     def _set_line_segments(self):
         lines = []
@@ -596,6 +716,20 @@ class PlatDiagram(object):
         self.knots = knots
         self.link_is_connected = len(self.knots) == 1
 
+    def _set_lch_graded_by(self):
+        """We only use Z gradings for LCH when our link is a not with zero rotation. This can be improved."""
+        if len(self.knots) == 1 and self.knots[0]['rot'] == 0:
+            self.lch_graded_by = ZZ
+        else:
+            self.lch_graded_by = ZZ2
+
+    def _set_rsft_graded_by(self):
+        """Only use Z gradings if all knot components have rot=0. This can be improved."""
+        if all([k['rot'] == 0 for k in self.knots]):
+            self.rsft_graded_by = ZZ
+        else:
+            self.rsft_graded_by = ZZ2
+
     def _set_composable_pairs(self):
         self.composable_pairs = [
             (chord_1, chord_2) for chord_1 in self.chords for chord_2 in self.chords
@@ -613,12 +747,13 @@ class PlatDiagram(object):
                 if next_segment.t_label:
                     path_is_t_labeled = True
                 capping_path_segments.append(next_segment)
-            self.capping_paths.append({
-                'start_chord': start_chord,
-                'end_chord': end_chord,
-                'line_segments': capping_path_segments
-            })
-
+            self.capping_paths.append(
+                CappingPath(
+                    start_chord=start_chord,
+                    end_chord=end_chord,
+                    line_segments=capping_path_segments
+                )
+            )
 
     def _set_plat_segments(self):
         max_left_x = max([ls.x_left for ls in self.line_segments])
@@ -653,20 +788,35 @@ class PlatDiagram(object):
         self.disk_corners = [d.disk_corners for d in self.disks]
 
     def _set_lch_generators(self):
-        self.lch_generators = self.chords
+        lch_generators = []
+        for chord in self.chords:
+            capping_path = (
+                self.get_capping_path(start_chord=chord, end_chord=chord)
+                if self.lch_graded_by == ZZ else None
+            )
+            lch_generators.append(
+                LCHGenerator(
+                    chord=chord,
+                    graded_by=self.lch_graded_by,
+                    capping_path=capping_path)
+            )
+        self.lch_generators = lch_generators
 
     def _set_lch_del(self):
         lch_disks = [d for d in self.disks if d.is_lch()]
-        lch_del = {g: list() for g in self.lch_generators}
+        lch_del = {g.symbol: 0 for g in self.lch_generators}
         for d in lch_disks:
             disk_corners = d.disk_corners.copy()
             # cyclically rotate disk until positive corner is in the last (-1) position
             while disk_corners[-1].pos_neg == '-':
                 last_corner = disk_corners.pop(-1)
                 disk_corners = [last_corner] + disk_corners
-            pos_chord = disk_corners.pop().chord
-            neg_chords = WordOfChords(word=[dc.chord for dc in disk_corners])
-            lch_del[pos_chord].append(neg_chords)
+            pos_generator = self.get_lch_generator_from_chord(disk_corners.pop().chord).symbol
+            if len(disk_corners) > 0:
+                neg_word = math.prod([self.get_lch_generator_from_chord(dc.chord).symbol for dc in disk_corners])
+            else:
+                neg_word = 1
+            lch_del[pos_generator] += neg_word
         self.lch_del = lch_del
 
     def _set_rsft_generators(self):
@@ -682,8 +832,23 @@ class PlatDiagram(object):
             new_words = [word for word in new_words
                          if max(Counter([c.top_line_segment.knot_label for c in word]).values()) == 1]
             composable_admissible_words.append(new_words)
-        cyclic_composable_admissible_words = [
-            w for wl in range(len(composable_admissible_words))
-            for w in composable_admissible_words[wl]
-            if w[-1].is_composable_with(w[0])]
-        self.rsft_generators = [WordOfChords(word) for word in cyclic_composable_admissible_words]
+
+        cyclic_composable_admissible_words = []
+        for wl in range(len(composable_admissible_words)):
+            for w in composable_admissible_words[wl]:
+                if w[-1].is_composable_with(w[0]):
+                    capping_paths = None
+                    if self.rsft_graded_by.is_ZZ:
+                        if len(w) == 1:
+                            capping_paths = [self.get_capping_path(w[0], w[0])]
+                        else:
+                            capping_paths = [self.get_capping_path(w[i], w[i+1]) for i in range(len(w) - 1)]
+                            capping_paths.append(self.get_capping_path(w[-1], w[0]))
+                    cyclic_composable_admissible_words.append(
+                        RSFTGenerator(
+                            word=w,
+                            graded_by=self.rsft_graded_by,
+                            capping_paths=capping_paths
+                        )
+                    )
+        self.rsft_generators = cyclic_composable_admissible_words

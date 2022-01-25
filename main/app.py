@@ -50,16 +50,16 @@ def get_template_context(plat_diagram, increment=50, pad=10):
     chords = [
         {
             "string": chord.to_string(),
-            "z2_grading": str(chord.z2_grading),
+            "grading": str(plat_diagram.get_lch_generator_from_chord(chord).grading),
             "from_knot": chord.bottom_line_segment.knot_label,
             "to_knot": chord.top_line_segment.knot_label,
-            "lch_del": " + ".join(word.to_string() for word in plat_diagram.lch_del[chord])
+            "lch_del": str(plat_diagram.lch_del[plat_diagram.get_lch_generator_from_chord(chord).symbol])
         }
         for chord in plat_diagram.chords]
     rsft_generators = [
         {
-            "string": word.to_string(),
-            "z2_grading": word.z2_grading
+            "string": word.string,
+            "grading": word.grading
         }
         for word in plat_diagram.rsft_generators
     ]
@@ -78,7 +78,7 @@ def get_template_context(plat_diagram, increment=50, pad=10):
                 'label': {
                     'x': increment + pad + int(increment * (ls['array'][0][0] + ls['array'][1][0]) / 2),
                     'y': pad + int(increment * (ls['array'][0][1] + ls['array'][1][1]) / 2),
-                    'marker': 'T' if ls['t_label'] else KNOT_ORIENTATIONS_TO_ARROW[ls['orientation']]
+                    'marker': KNOT_ORIENTATIONS_TO_ARROW[ls['orientation']] if ls['t_label'] else ''
                 }
             }
             for ls in line_segments],
@@ -88,7 +88,9 @@ def get_template_context(plat_diagram, increment=50, pad=10):
         'n_disks': len(disk_corners),
         'disk_corners': disk_corners,
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],
-        'y_labels': [{"label": y, "y": int(pad + increment * y + increment / 2)} for y in range(n_strands - 1)]
+        'y_labels': [{"label": y, "y": int(pad + increment * y + increment / 2)} for y in range(n_strands - 1)],
+        'lch_graded_by': str(plat_diagram.lch_graded_by),
+        'rsft_graded_by': str(plat_diagram.rsft_graded_by)
     }
     return template_context
 

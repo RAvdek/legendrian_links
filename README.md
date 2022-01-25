@@ -22,8 +22,7 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Compute winding numbers of capping paths.
-- Use these to compute Z gradings in LCH and RSFT.
+- Tests added to ensure that gradings are computed appropriately in LCH.
 - Introduce t coordinate in differentials.
 - Orientations: Process disks into differentials for LCH with Z coefficients.
 - Describe the even degree part of the characteristic algebra as a quotient of a polynomial ring using `sympy`.
