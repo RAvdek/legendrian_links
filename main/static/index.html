@@ -65,7 +65,7 @@ Products of chords as lists of their x-coordinate (empty chord = unit = "[]"):
   {% for chord in chords %}
   <tr>
     <td>{{ chord["string"] }}</td>
-    <td>{{ chord["grading"] }}</td>
+    <td>{{ chord["Z2_grading"] }}</td>
     <td>{{ chord["from_knot"] }}</td>
     <td>{{ chord["to_knot"] }}</td>
     <td>{{ chord["lch_del"] }}</td>
@@ -83,7 +83,7 @@ RSFT generators
   {% for word in rsft_generators %}
   <tr>
     <td>{{ word["string"] }}</td>
-    <td>{{ word["grading"] }}</td>
+    <td>{{ word["Z2_grading"] }}</td>
   </tr>
   {% endfor %}
 </table>

@@ -22,10 +22,16 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
+- Compute winding numbers of capping paths.
+- Use these to compute Z gradings in LCH and RSFT.
 - Introduce t coordinate in differentials.
-- Process disks into differentials for RSFT with Z/2Z coefficients and grading.
+- Orientations: Process disks into differentials for LCH with Z coefficients.
+- Describe the even degree part of the characteristic algebra as a quotient of a polynomial ring using `sympy`.
+- Extract Sivek's work on enumerating augmentations. Want to do this purely algebraically so that it can handle both LCH and RSFT.
+- Clean up appearance of left/right indicators in SVG.
+- Ability to flip orientations of link components.
 - Compute numbers of Z/2Z augmentations. Should be in a new module.
-- Process disks into differentials for LCH and RSFT with Z coefficients.
+- Process disks into differentials for RSFT with Z/2Z coefficients and grading.
 - Ability to reverse orientations on link components.
 - Compute differentials for 2-copies and twisted 2-copies.
 

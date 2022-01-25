@@ -50,7 +50,7 @@ def get_template_context(plat_diagram, increment=50, pad=10):
     chords = [
         {
             "string": chord.to_string(),
-            "grading": str(chord.grading),
+            "z2_grading": str(chord.z2_grading),
             "from_knot": chord.bottom_line_segment.knot_label,
             "to_knot": chord.top_line_segment.knot_label,
             "lch_del": " + ".join(word.to_string() for word in plat_diagram.lch_del[chord])
@@ -59,7 +59,7 @@ def get_template_context(plat_diagram, increment=50, pad=10):
     rsft_generators = [
         {
             "string": word.to_string(),
-            "grading": word.grading
+            "z2_grading": word.z2_grading
         }
         for word in plat_diagram.rsft_generators
     ]

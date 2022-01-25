@@ -16,7 +16,7 @@ class Chord(object):
         self.bottom_line_segment = bottom_line_segment
         self._set_xy()
         self._set_sign()
-        self._set_grading()
+        self._set_z2_grading()
 
     def to_string(self):
         return f"[{self.x}]"
@@ -35,8 +35,8 @@ class Chord(object):
                              f"bottom {self.bottom_line_segment.to_array()}")
         self.sign = 1 if self.top_line_segment.orientation == self.bottom_line_segment.orientation else -1
 
-    def _set_grading(self):
-        self.grading = 1 if self.sign == -1 else 0
+    def _set_z2_grading(self):
+        self.z2_grading = 1 if self.sign == -1 else 0
 
 
 class WordOfChords(object):
@@ -46,14 +46,14 @@ class WordOfChords(object):
             if not isinstance(chord, Chord):
                 raise ValueError("Trying to create WordOfChord object not from a list of chords")
         self.word = word
-        self._set_grading()
+        self._set_z2_grading()
         self._set_x_array()
 
     def to_string(self):
         return "[" + ",".join([str(chord.x) for chord in self.word]) + "]"
 
-    def _set_grading(self):
-        self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
+    def _set_z2_grading(self):
+        self.z2_grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
 
     def _set_x_array(self):
         self.x_array = [chord.bottom_line_segment.x_left for chord in self.word]
@@ -377,6 +377,8 @@ class PlatDiagram(object):
         # wait to set crossings until the line segments have been labeled
         self._set_chords()
         self._set_knots()
+        self._set_composable_pairs()
+        self._set_capping_paths()
         self._set_plat_segments()
         self._set_disk_graph()
         self._set_disks()
@@ -413,15 +415,18 @@ class PlatDiagram(object):
                 f'Line segments available: {[ls.to_array() for ls in self.line_segments]}')
         return search_results[0]
 
-    def get_next_line_segment(self, line_segment):
-        if line_segment.orientation == 'r':
+    def get_next_line_segment(self, line_segment, reverse=False):
+        orientation = line_segment.orientation
+        if reverse:
+            orientation = 'r' if orientation == 'l' else 'r'
+        if orientation == 'r':
             if line_segment.x_left == self.max_x_left:
                 if line_segment.y_left > line_segment.y_right:
                     return self.get_line_segment_by_left_xy(x=line_segment.x_left, y=line_segment.y_left - 1)
                 else:
                     return self.get_line_segment_by_left_xy(x=line_segment.x_left, y=line_segment.y_left + 1)
             else:
-                return self.get_line_segment_by_left_xy(x=line_segment.right_x, y=line_segment.right_y)
+                return self.get_line_segment_by_left_xy(x=line_segment.x_right, y=line_segment.y_right)
         else:
             if line_segment.x_left == 0:
                 if line_segment.y_left > line_segment.y_right:
@@ -429,7 +434,7 @@ class PlatDiagram(object):
                 else:
                     return self.get_line_segment_by_right_xy(x=line_segment.x_right, y=line_segment.y_right - 1)
             else:
-                return self.get_line_segment_by_right_xy(x=line_segment.left_x, y=line_segment.left_y)
+                return self.get_line_segment_by_right_xy(x=line_segment.x_left, y=line_segment.y_left)
 
     def line_segment_is_incoming_to_left_up_cusp(self, line_segment):
         if not (line_segment.x_left == 0 and line_segment.orientation == 'l'):
@@ -589,6 +594,31 @@ class PlatDiagram(object):
             })
 
         self.knots = knots
+        self.link_is_connected = len(self.knots) == 1
+
+    def _set_composable_pairs(self):
+        self.composable_pairs = [
+            (chord_1, chord_2) for chord_1 in self.chords for chord_2 in self.chords
+            if chord_1.is_composable_with(chord_2)
+        ]
+
+    def _set_capping_paths(self):
+        self.capping_paths = []
+        for start_chord, end_chord in self.composable_pairs:
+            start_segment = start_chord.top_line_segment
+            end_segment = end_chord.bottom_line_segment
+            capping_path_segments = [start_segment]
+            while capping_path_segments[-1] != end_segment:
+                next_segment = self.get_next_line_segment(capping_path_segments[-1])
+                if next_segment.t_label:
+                    path_is_t_labeled = True
+                capping_path_segments.append(next_segment)
+            self.capping_paths.append({
+                'start_chord': start_chord,
+                'end_chord': end_chord,
+                'line_segments': capping_path_segments
+            })
+
 
     def _set_plat_segments(self):
         max_left_x = max([ls.x_left for ls in self.line_segments])
