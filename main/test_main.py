@@ -4,8 +4,7 @@ import legendrian_links as ll
 
 class TestLinks(unittest.TestCase):
 
-    def _test_link(self, n_strands, front_crossings, n_knots, n_disks, tb_rot=None):
-        # TODO: Should be able to test for rot and tb.
+    def _test_link(self, n_strands, front_crossings, n_knots, n_disks, tb_rot=None, lch_gradings=None):
 
         pd = ll.PlatDiagram(n_strands=n_strands, front_crossings=front_crossings)
 
@@ -23,6 +22,13 @@ class TestLinks(unittest.TestCase):
             t_labeled_segments = [ls for ls in knot['line_segments'] if ls.t_label]
             self.assertTrue(len(t_labeled_segments), 1)
 
+        # Each capping path should have rotation a multiple of 1/2
+        for cp in pd.capping_paths:
+            self.assertEqual(int(2 * cp.rotation_number) % 2, 1)
+
+        if lch_gradings is not None:
+            self.assertEqual({g.grading for g in pd.lch_generators}, lch_gradings)
+
         # The x-values of disk segments in each disk are all distinct
         for d in pd.disks:
             ds_x_values = [ds.x for ds in d.disk_segments]
@@ -36,13 +42,13 @@ class TestLinks(unittest.TestCase):
                 self.assertTrue(pd.knots[0]['rot'] in rot)
 
     def test_unknot(self):
-        self._test_link(2, [], 1, 2, tb_rot=[-1, [0]])
+        self._test_link(2, [], 1, 2, tb_rot=[-1, [0]], lch_gradings={1})
 
     def test_stabilized_unknot(self):
         self._test_link(2, [0], 1, 3, tb_rot=[-2, [1, -1]])
 
     def test_twisted_unknot(self):
-        self._test_link(4, [1], 1, 4)
+        self._test_link(4, [1], 1, 4, lch_gradings={0, 1})
 
     def test_very_twisted_unknot(self):
         self._test_link(2, [0]*5, 1, 7, tb_rot=[-6, [1, -1]])
@@ -54,7 +60,7 @@ class TestLinks(unittest.TestCase):
         self._test_link(4, [1]*2, 2, 7)
 
     def test_trefoil(self):
-        self._test_link(4, [1]*3, 1, 10, tb_rot=[1, [0]])
+        self._test_link(4, [1]*3, 1, 10, tb_rot=[1, [0]], lch_gradings={0, 1})
 
 
 if __name__ == '__main__':

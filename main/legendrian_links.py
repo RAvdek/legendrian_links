@@ -8,7 +8,6 @@ LOG = utils.get_logger(__name__)
 ZZ = sympy.ZZ
 ZZ2 = sympy.GF(2)
 HALF = sympy.Rational(1, 2)
-QUARTER = sympy.Rational(1, 4)
 
 
 def graded_by_valid_or_except(graded_by):
@@ -403,6 +402,9 @@ class LineSegment(object):
     def to_array(self):
         return [[self.x_left, self.y_left], [self.x_right, self.y_right]]
 
+    def to_string(self):
+        return str(self.to_array())
+
     def set_orientation(self, o):
         if o not in self.ORIENTATIONS:
             raise ValueError(f'LineSegment orientation must be in {self.ORIENTATIONS}')
@@ -421,49 +423,39 @@ class CappingPath(object):
     Rotation numbers are computed assuming that all .
     """
 
-    def __init__(self, start_chord, end_chord, line_segments):
+    def __init__(self, start_chord, end_chord, line_segments, t_label):
         self.start_chord = start_chord
         self.end_chord = end_chord
         self.line_segments = line_segments
+        self.t_label = t_label
         self._set_touches_basepoint()
         self._set_rotation_number()
+
+    def segments_to_string(self):
+        return ", ".join([ls.to_string() for ls in self.line_segments])
 
     def _set_touches_basepoint(self):
         self.touches_basepoint = any([segment.t_label for segment in self.line_segments])
 
     def _set_rotation_number(self):
-        """Rotation numbers will be multiples of one half.
+        """Rotation numbers will be multiples of one half, given by rotation angles divided by pi.
         Stored as sympy.Rational to avoid float issues"""
         switches = [
             (self.line_segments[i], self.line_segments[i+1])
             for i in range(len(self.line_segments) - 1)
             if self.line_segments[i].orientation != self.line_segments[i+1].orientation
         ]
-        rotation_number = sympy.Rational(0, 1)
-        # plus number of upward right-to-left switches
-        rotation_number += len([
-            s for s in switches
-            if s[0].orientation == 'r' and s[0].x_left > s[1].x_left
-        ])
-        # minus number of downward right-to-left switches
-        rotation_number -= len([
-            s for s in switches
-            if s[0].orientation == 'r' and s[0].x_left < s[1].x_left
-        ])
-        # minus number of upward left-to-right switches
-        rotation_number -= len([
-            s for s in switches
-            if s[0].orientation == 'l' and s[0].x_left > s[1].x_left
-        ])
-        # plus number of downward left-to-right switches
-        rotation_number += len([
-            s for s in switches
-            if s[0].orientation == 'l' and s[0].x_left < s[1].x_left
-        ])
-        # add quarter rotations to start and end
 
-        rotation_number += QUARTER if self.line_segments[0].orientation == 'l' else -QUARTER
-        rotation_number += QUARTER if self.line_segments[-1].orientation == 'r' else -QUARTER
+        def sign_of_switch(switch):
+            if switch[0].orientation == 'r':
+                return 1 if switch[0].y_left > switch[1].y_left else -1
+            else:
+                return -1 if switch[0].y_right > switch[1].y_right else 1
+
+        rotation_number = sum([sign_of_switch(switch) for switch in switches])
+        # we get a quarter at both the initial and terminal points
+        rotation_number += HALF
+
         self.rotation_number = rotation_number
 
 
@@ -742,6 +734,7 @@ class PlatDiagram(object):
             start_segment = start_chord.top_line_segment
             end_segment = end_chord.bottom_line_segment
             capping_path_segments = [start_segment]
+            path_is_t_labeled = False
             while capping_path_segments[-1] != end_segment:
                 next_segment = self.get_next_line_segment(capping_path_segments[-1])
                 if next_segment.t_label:
@@ -751,7 +744,8 @@ class PlatDiagram(object):
                 CappingPath(
                     start_chord=start_chord,
                     end_chord=end_chord,
-                    line_segments=capping_path_segments
+                    line_segments=capping_path_segments,
+                    t_label=path_is_t_labeled
                 )
             )
 

@@ -22,8 +22,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Tests added to ensure that gradings are computed appropriately in LCH.
 - Introduce t coordinate in differentials.
+- Tests added to ensure that gradings are computed appropriately in RSFT.
 - Orientations: Process disks into differentials for LCH with Z coefficients.
 - Describe the even degree part of the characteristic algebra as a quotient of a polynomial ring using `sympy`.
 - Extract Sivek's work on enumerating augmentations. Want to do this purely algebraically so that it can handle both LCH and RSFT.
