@@ -2,6 +2,8 @@
 
 An interactive application for analyzing Legendrian links. Or it will be some day, maybe.
 
+Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra. We also want to make analysis of knots accessible through a web application (with minimal dependencies) so that users don't need to know how to code.
+
 # Installation
 
 To install and run the server from your terminal from the root of the project:
@@ -22,17 +24,18 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Introduce t coordinate in differentials.
-- Tests added to ensure that gradings are computed appropriately in RSFT.
-- Orientations: Process disks into differentials for LCH with Z coefficients.
-- Describe the even degree part of the characteristic algebra as a quotient of a polynomial ring using `sympy`.
-- Extract Sivek's work on enumerating augmentations. Want to do this purely algebraically so that it can handle both LCH and RSFT.
-- Clean up appearance of left/right indicators in SVG.
+- We should not bother with RSFT algebras when the link is a knot. This means gutting some parts of the HTML in the knot case.
+- We should automatically run augsearch for the LCH algebra with Z/2Z coeffs.
+- Tests should check that augsearch runs properly on some specific cases. It works (for sure) now for the trefoil.
+- Process disks into (commutative) differentials for RSFT with Z/2Z coefficients and grading.
+- Speed up `augsearch` by searching for variables which appear most frequently in a set of polynomials.
+- Introduce t coordinate in differentials. (This is not so important for augmentations).
 - Ability to flip orientations of link components.
-- Compute numbers of Z/2Z augmentations. Should be in a new module.
-- Process disks into differentials for RSFT with Z/2Z coefficients and grading.
 - Ability to reverse orientations on link components.
+- Orientations: Process disks into differentials for LCH with Z coefficients.
+- Algorithmically determine a plat diagram from a grid diagram.
 - Compute differentials for 2-copies and twisted 2-copies.
+- In the we interface, users can do basic input links, flip components, etc with HTML / javascript input.
 
 ## Data sets
 
