@@ -26,8 +26,9 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 - We should not bother with RSFT algebras when the link is a knot. This means gutting some parts of the HTML in the knot case.
 - We should automatically run augsearch for the LCH algebra with Z/2Z coeffs.
-- Tests should check that augsearch runs properly on some specific cases. It works (for sure) now for the trefoil.
+- Augsearch test cases needed for more polynomials.
 - Process disks into (commutative) differentials for RSFT with Z/2Z coefficients and grading.
+- Check if two augmentations are homotopic are not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Speed up `augsearch` by searching for variables which appear most frequently in a set of polynomials.
 - Introduce t coordinate in differentials. (This is not so important for augmentations).
 - Ability to flip orientations of link components.

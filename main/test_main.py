@@ -1,4 +1,6 @@
 import unittest
+import sympy
+import augsearch
 import legendrian_links as ll
 
 
@@ -61,6 +63,35 @@ class TestLinks(unittest.TestCase):
 
     def test_trefoil(self):
         self._test_link(4, [1]*3, 1, 10, tb_rot=[1, [0]], lch_gradings={0, 1})
+
+
+class TestAugsearch(unittest.TestCase):
+
+    def test_trefoil(self):
+        x, y, z = sympy.symbols('x,y,z')
+        symbols = [x, y, z]
+        polys = [1 + x + z + x * y * z]
+        results = augsearch.get_augs(polys=polys, symbols=symbols, modulus=2)
+        expected_results = [
+            {x: 0, z: 1, y: 0},
+            {x: 0, z: 1, y: 1},
+            {x: 1, y: 0, z: 0},
+            {x: 1, y: 1, z: 0},
+            {x: 1, y: 1, z: 1}
+        ]
+        self.assertEqual(results, expected_results)
+
+    def test_hopf_link(self):
+        x, y = sympy.symbols('x,y')
+        symbols = [x, y]
+        polys = [y * x]
+        results = augsearch.get_augs(polys=polys, symbols=symbols, modulus=2)
+        expected_results = [
+            {x: 1, y: 0},
+            {x: 0, y: 0},
+            {x: 0, y: 1}
+        ]
+        self.assertEqual(results, expected_results)
 
 
 if __name__ == '__main__':
