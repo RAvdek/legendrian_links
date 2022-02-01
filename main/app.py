@@ -36,32 +36,32 @@ KNOT_ORIENTATIONS_TO_ARROW = {
 }
 
 
-def get_template_context(plat_diagram, increment=50, pad=10):
-    n_strands = plat_diagram.n_strands
-    n_segments = len(plat_diagram.plat_segments)
-    height = increment * plat_diagram.n_strands + pad
+def get_template_context(pd, increment=50, pad=10):
+    n_strands = pd.n_strands
+    n_segments = len(pd.plat_segments)
+    height = increment * pd.n_strands + pad
     width = (increment * n_segments) + pad + increment
-    line_segments = plat_diagram.get_line_segment_array()
-    disk_corners = plat_diagram.disk_corners
-    knots = plat_diagram.knots
+    line_segments = pd.get_line_segment_array()
+    disk_corners = pd.disk_corners
+    knots = pd.knots
     for k in range(len(knots)):
         knots[k]["label"] = k
         knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
     chords = [
         {
-            "string": chord.to_string(),
-            "grading": str(plat_diagram.get_lch_generator_from_chord(chord).grading),
+            "string": str(chord),
+            "grading": str(pd.get_lch_generator_from_chord(chord).grading),
             "from_knot": chord.bottom_line_segment.knot_label,
             "to_knot": chord.top_line_segment.knot_label,
-            "lch_del": str(plat_diagram.lch_del[plat_diagram.get_lch_generator_from_chord(chord).symbol])
+            "lch_del": str(pd.lch_del[pd.get_lch_generator_from_chord(chord).symbol].to_polynomial())
         }
-        for chord in plat_diagram.chords]
+        for chord in pd.chords]
     rsft_generators = [
         {
-            "string": word.string,
+            "string": str(word),
             "grading": word.grading
         }
-        for word in plat_diagram.rsft_generators
+        for word in pd.rsft_generators
     ]
     template_context = {
         "pad": pad,
@@ -89,8 +89,8 @@ def get_template_context(plat_diagram, increment=50, pad=10):
         'disk_corners': disk_corners,
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],
         'y_labels': [{"label": y, "y": int(pad + increment * y + increment / 2)} for y in range(n_strands - 1)],
-        'lch_graded_by': str(plat_diagram.lch_graded_by),
-        'rsft_graded_by': str(plat_diagram.rsft_graded_by)
+        'lch_graded_by': str(pd.lch_graded_by),
+        'rsft_graded_by': str(pd.rsft_graded_by)
     }
     return template_context
 
@@ -112,7 +112,7 @@ def home():
             data = LINKS[DEFAULT_LINK_KEY].copy()
             data.pop('comment')
             pd = ll.PlatDiagram(**data)
-    template_context = get_template_context(plat_diagram=pd)
+    template_context = get_template_context(pd=pd)
     context = INDEX_TEMPLATE.render(**template_context)
     return make_response(context)
 

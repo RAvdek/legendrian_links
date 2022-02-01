@@ -1,6 +1,6 @@
 from collections import Counter
-import math
 import sympy
+import dga
 import utils
 
 
@@ -27,8 +27,8 @@ class Chord(object):
         self._set_xy()
         self._set_sign()
 
-    def to_string(self):
-        return f"[{self.x}]"
+    def __repr__(self):
+        return str(self.x)
 
     def is_composable_with(self, chord):
         return self.top_line_segment.knot_label == chord.bottom_line_segment.knot_label
@@ -64,7 +64,7 @@ class LCHGenerator(object):
             self.grading = 0 if self.chord.sign == 1 else 1
 
     def _set_string(self):
-        self.string = f"[{str(self.chord.x)}]"
+        self.string = "{" + str(self.chord.x) + "}"
 
     def _set_symbol(self):
         self.symbol = sympy.Symbol(self.string)
@@ -86,8 +86,10 @@ class RSFTGenerator(object):
                 raise ValueError(f"len(capping_paths) = {len(capping_paths)} != len(word) = {len(word)}")
         self.graded_by = graded_by
         self._set_grading()
-        self._set_string()
         self._set_symbol()
+
+    def __repr__(self):
+         return "{" + ",".join([str(chord.x) for chord in self.word]) + "}"
 
     def _set_grading(self):
         if self.graded_by.is_ZZ:
@@ -95,11 +97,8 @@ class RSFTGenerator(object):
         else:
             self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
 
-    def _set_string(self):
-        self.string = "[" + ",".join([str(chord.x) for chord in self.word]) + "]"
-
     def _set_symbol(self):
-        self.symbol = sympy.Symbol(self.string)
+        self.symbol = sympy.Symbol(str(self))
 
 
 class DiskCorner(object):
@@ -402,7 +401,7 @@ class LineSegment(object):
     def to_array(self):
         return [[self.x_left, self.y_left], [self.x_right, self.y_right]]
 
-    def to_string(self):
+    def __repr__(self):
         return str(self.to_array())
 
     def set_orientation(self, o):
@@ -431,8 +430,8 @@ class CappingPath(object):
         self._set_touches_basepoint()
         self._set_rotation_number()
 
-    def segments_to_string(self):
-        return ", ".join([ls.to_string() for ls in self.line_segments])
+    def __repr__(self):
+        return ", ".join([str(ls) for ls in self.line_segments])
 
     def _set_touches_basepoint(self):
         self.touches_basepoint = any([segment.t_label for segment in self.line_segments])
@@ -561,15 +560,15 @@ class PlatDiagram(object):
         n_results = len(search_results)
         if n_results != 1:
             raise RuntimeError(f"Found {n_results} possible capping paths for"
-                               f"start_chord={start_chord.to_string()} and"
-                               f"end_chord={end_chord.to_string()}")
+                               f"start_chord={start_chord} and"
+                               f"end_chord={end_chord}")
         return search_results[0]
 
     def get_lch_generator_from_chord(self, chord):
         search_results = [g for g in self.lch_generators if g.chord == chord]
         n_results = len(search_results)
         if n_results != 1:
-            raise RuntimeError(f"Found {n_results} possible LCH generators for chord {chord.to_string()}")
+            raise RuntimeError(f"Found {n_results} possible LCH generators for chord {chord}")
         return search_results[0]
 
     def _set_line_segments(self):
@@ -798,19 +797,27 @@ class PlatDiagram(object):
 
     def _set_lch_del(self):
         lch_disks = [d for d in self.disks if d.is_lch()]
-        lch_del = {g.symbol: 0 for g in self.lch_generators}
+        lch_del = {g.symbol: [] for g in self.lch_generators}
+        lch_del_signs = {g.symbol: [] for g in self.lch_generators}
         for d in lch_disks:
             disk_corners = d.disk_corners.copy()
             # cyclically rotate disk until positive corner is in the last (-1) position
             while disk_corners[-1].pos_neg == '-':
                 last_corner = disk_corners.pop(-1)
                 disk_corners = [last_corner] + disk_corners
-            pos_generator = self.get_lch_generator_from_chord(disk_corners.pop().chord).symbol
+            pos_chord = disk_corners.pop().chord
+            pos_generator = self.get_lch_generator_from_chord(pos_chord).symbol
             if len(disk_corners) > 0:
-                neg_word = math.prod([self.get_lch_generator_from_chord(dc.chord).symbol for dc in disk_corners])
+                neg_word = [self.get_lch_generator_from_chord(dc.chord).symbol for dc in disk_corners]
             else:
-                neg_word = 1
-            lch_del[pos_generator] += neg_word
+                neg_word = [1]
+            # Add negative word of chords as a summand to the LCH
+            lch_del[pos_generator].append(neg_word)
+            lch_del_signs[pos_generator].append(1)
+        lch_del = {
+            g: dga.Differential(summands=lch_del[g], signs=lch_del_signs[g])
+            for g in lch_del.keys()
+        }
         self.lch_del = lch_del
 
     def _set_rsft_generators(self):

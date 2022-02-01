@@ -25,26 +25,29 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 ## Features
 
 - We should not bother with RSFT algebras when the link is a knot. This means gutting some parts of the HTML in the knot case.
-- We should automatically run augsearch for the LCH algebra with Z/2Z coeffs.
-- Augsearch test cases needed for more polynomials.
-- Process disks into (commutative) differentials for RSFT with Z/2Z coefficients and grading.
+- We should automatically run augsearch for the LCH algebra with Z/2Z coeffs and display retults in HTML.
+- Process disks into differentials for RSFT with Z/2Z coefficients and grading. Then put Z/2Z augs into HTML table.
 - Check if two augmentations are homotopic are not, by seeing if the bilinearized homology has non-zero hom to the base field.
-- Speed up `augsearch` by searching for variables which appear most frequently in a set of polynomials.
-- Introduce t coordinate in differentials. (This is not so important for augmentations).
+- Compute linearized homologies and put their Poincare polynomials into an HTML table.
+- Introduce t coordinate in differentials. (This is not so important for augmentations where we can use t=1 for Z/2Z coeffs).
 - Ability to flip orientations of link components.
 - Ability to reverse orientations on link components.
 - Orientations: Process disks into differentials for LCH with Z coefficients.
+- Carry out orientation processing for RSFT differentials.
 - Algorithmically determine a plat diagram from a grid diagram.
 - Compute differentials for 2-copies and twisted 2-copies.
 - In the we interface, users can do basic input links, flip components, etc with HTML / javascript input.
+
+## Cleanup, performance, and testing
+
+- dga.py test cases needed for more polynomials.
+- dga.py needs tests for differentials and DGA class methods.
+- Speed up `augsearch` by searching for variables which appear most frequently in a set of polynomials.
+- Add pylint or something to ensure code cleanliness.
+- Review relationships between data structures.
+- Make `legendrian_links` importable as a python library.
 
 ## Data sets
 
 - Port knots from the Legendrian knot atlas or other resource into `links.json`.
 - Get two component links from the link atlas.
-
-## Code cleanup
-
-- Add pylint or something to ensure code cleanliness.
-- Review relationships between data structures.
-- Make `legendrian_links` importable as a python library.
