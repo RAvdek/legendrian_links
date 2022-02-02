@@ -24,6 +24,10 @@ class Differential(object):
         return str(self.summands)
 
     def to_polynomial(self):
+        # When char(field) != 2, we have to worry about how the orders of the elements are multiplied, as minus signs
+        # may be created for swapping orders of odd-degree generators.
+        if not self.coeff_mod == 2:
+            raise NotImplementedError()
         output = 0
         for i in range(len(self.summands)):
             output += self.signs[i]*prod(self.summands[i])
@@ -43,7 +47,7 @@ class DGA(object):
         """
         :param symbols: Dictionary mapping generator -> grading.
         :param differentials: Dictionary mapping generator -> polynomial.
-        :param coeff_mod: m when using Z/mZ coeffs.
+        :param coeff_mod: m when using Z/mZ coeffs. Must be zero or prime.
         :param grading_mod: m when using Z/mZ grading.
         """
         self.symbols = self.gradings.keys()
@@ -67,7 +71,34 @@ class DGA(object):
             grading_mod=grading_mod
         )
 
+    def are_homotopy_equivalent(self, aug_1, aug_2):
+        """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field
+        given by aug = (aug_1 - aug_2) is zero. How do we figure this out using only generators of the underlying vector
+        spaces of generators? Since aug(del(x)) always vanishes, it is already zero on Image(del). Therefore aug == 0
+        on homology iff it vanishes on ker del.
+
+        :param aug_1:
+        :param aug_2:
+        :return:
+        """
+        raise NotImplementedError()
+
+    def bilinearized_poincare_poly(self, aug_1, aug_2):
+        """If we assume that the base field is a prime (so that the coeff ring is a field) then we don't need to
+        understand the homology groups in terms of generators and relations. We can get the ith betti number by
+        b_i = dim(ker del_i) - rank del_{i-1}. Both of these should be available in sympy.
+
+        :param aug_1:
+        :param aug_2:
+        :return:
+        """
+        raise NotImplementedError()
+
+    def linearized_poincare_poly(self, aug):
+        return self.bilinearized_poincare_poly(aug, aug)
+
     def _set_augmentations(self):
+        # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
         polys = [d.to_polynomial() for d in self.differentials.values()]
@@ -83,6 +114,9 @@ class DGA(object):
         self.augmentations = augmentations(polys=polys, symbols=symbols, modulus=self.coeff_mod)
 
     def _verify_init_args(self):
+        if self.coeff_mod != 0:
+            if not sympy.is_prime(self.coeff_mod):
+                raise ValueError(f"Coefficient modulus {self.coeff_mod} is not 0 or prime")
         if self.symbols.keys() != self.differentials.keys():
             raise ValueError("generators don't match in symbols and keys")
         for g, d in self.differentials:
