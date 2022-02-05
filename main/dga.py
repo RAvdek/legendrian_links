@@ -15,7 +15,7 @@ class Differential(object):
     This non-commutative storage is needed for bilinearization.
     """
 
-    def __init__(self, summands=[], coeff_mod=0, signs=[]):
+    def __init__(self, summands=[], coeff_mod=2, signs=[]):
         self.summands = summands
         self.coeff_mod = coeff_mod
         self.signs = signs
@@ -50,8 +50,8 @@ class DGA(object):
         :param coeff_mod: m when using Z/mZ coeffs. Must be zero or prime.
         :param grading_mod: m when using Z/mZ grading.
         """
-        self.symbols = self.gradings.keys()
         self.gradings = gradings
+        self.symbols = self.gradings.keys()
         self.differentials = differentials
         self.coeff_mod = coeff_mod
         self.grading_mod = grading_mod
@@ -121,17 +121,18 @@ class DGA(object):
 
     def _verify_init_args(self):
         if self.coeff_mod != 0:
-            if not sympy.is_prime(self.coeff_mod):
+            if not sympy.isprime(self.coeff_mod):
                 raise ValueError(f"Coefficient modulus {self.coeff_mod} is not 0 or prime")
-        if self.symbols.keys() != self.differentials.keys():
+        if self.symbols != self.differentials.keys():
             raise ValueError("generators don't match in symbols and keys")
-        for g, d in self.differentials:
+        for g, d in self.differentials.items():
             if not isinstance(d, Differential):
                 raise ValueError(f"Differential for {g} is not instance of class Differential.")
 
     def _correct_gradings(self):
-        corrected_gradings = {g: self.gradings[g] % self.grading_mod for g in self.gradings.keys()}
-        self.gradings = corrected_gradings
+        if self.grading_mod != 0:
+            corrected_gradings = {g: self.gradings[g] % self.grading_mod for g in self.gradings.keys()}
+            self.gradings = corrected_gradings
 
 
 def zero_set(polys, symbols, modulus=2, existence_only=False):
@@ -143,6 +144,8 @@ def zero_set(polys, symbols, modulus=2, existence_only=False):
     """
     if modulus == 0:
         raise ValueError("We can only solve for zero sets over Z/mZ with m!=0.")
+    if len(symbols) == 0:
+        return []
     root = SolutionSearchNode(polys, symbols, modulus=modulus, subs_dict=dict())
     nodes = [root]
     spawned_nodes = []
@@ -173,6 +176,24 @@ def finite_field_elements(modulus):
     return [n for n in range(modulus)]
 
 
+def highest_frequency_symbol(polys, symbols):
+    # Ensure that the order of symbols in input match those in polys by re-initializing
+    polys = [sympy.Poly(p, *symbols) for p in polys]
+    counter = {g: 0 for g in symbols}
+    for p in polys:
+        monoms = p.monoms()
+        for m in monoms:
+            for i in range(len(symbols)):
+                if m[i] != 0:
+                    # Here we are not weighting by powers! I think that this should not make a huge
+                    # difference for LCH computations as there should be no monomials divisible
+                    # by squares (eg. 1 + x + x*x*y) appearing in a plat.
+                    counter[symbols[i]] += 1
+    highest_freq = max(counter.values())
+    highest_freq_symbols = [g for g in symbols if counter[g] == highest_freq]
+    return highest_freq_symbols[0]
+
+
 class SolutionSearchNode(object):
 
     def __init__(self, polys, symbols, modulus, subs_dict):
@@ -194,8 +215,8 @@ class SolutionSearchNode(object):
         output = []
         if self.TERMINAL:
             return output
-        # here we can be smarter about which g we pick
-        g = self.get_unset_vars()[0]
+        # We choose the symbol which appears in the most monomials
+        g = highest_frequency_symbol(polys=self.polys, symbols=self.get_unset_vars())
         for c in finite_field_elements(modulus=self.modulus):
             subs = self.subs_dict.copy()
             subs[g] = c

@@ -53,8 +53,10 @@ class LCHGenerator(object):
         graded_by_valid_or_except(graded_by)
         self.graded_by = graded_by
         self._set_grading()
-        self._set_string()
         self._set_symbol()
+
+    def __repr__(self):
+        return "{" + str(self.chord.x) + "}"
 
     def _set_grading(self):
         if self.graded_by.is_ZZ:
@@ -63,11 +65,8 @@ class LCHGenerator(object):
         else:
             self.grading = 0 if self.chord.sign == 1 else 1
 
-    def _set_string(self):
-        self.string = "{" + str(self.chord.x) + "}"
-
     def _set_symbol(self):
-        self.symbol = sympy.Symbol(self.string)
+        self.symbol = sympy.Symbol(str(self))
 
 
 class RSFTGenerator(object):
@@ -471,7 +470,6 @@ class PlatDiagram(object):
         self._set_chords()
         self._set_knots()
         self._set_lch_graded_by()
-        self._set_rsft_graded_by()
         self._set_composable_pairs()
         self._set_capping_paths()
         self._set_plat_segments()
@@ -479,8 +477,10 @@ class PlatDiagram(object):
         self._set_disks()
         self._set_disk_corners()
         self._set_lch_generators()
-        self._set_lch_del()
-        self._set_rsft_generators()
+        self._set_lch_dga()
+        if not self.link_is_connected:
+            self._set_rsft_graded_by()
+            self._set_rsft_generators()
 
     def get_line_segment_array(self):
         return [
@@ -795,7 +795,7 @@ class PlatDiagram(object):
             )
         self.lch_generators = lch_generators
 
-    def _set_lch_del(self):
+    def _set_lch_dga(self):
         lch_disks = [d for d in self.disks if d.is_lch()]
         lch_del = {g.symbol: [] for g in self.lch_generators}
         lch_del_signs = {g.symbol: [] for g in self.lch_generators}
@@ -818,7 +818,9 @@ class PlatDiagram(object):
             g: dga.Differential(summands=lch_del[g], signs=lch_del_signs[g])
             for g in lch_del.keys()
         }
-        self.lch_del = lch_del
+
+        gradings = {g.symbol: g.grading for g in self.lch_generators}
+        self.lch_dga = dga.DGA(gradings=gradings, differentials=lch_del, coeff_mod=2)
 
     def _set_rsft_generators(self):
         # length 1 composable words

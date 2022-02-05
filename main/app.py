@@ -49,20 +49,21 @@ def get_template_context(pd, increment=50, pad=10):
         knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
     chords = [
         {
-            "string": str(chord),
+            "string": str(pd.get_lch_generator_from_chord(chord)),
             "grading": str(pd.get_lch_generator_from_chord(chord).grading),
             "from_knot": chord.bottom_line_segment.knot_label,
             "to_knot": chord.top_line_segment.knot_label,
-            "lch_del": str(pd.lch_del[pd.get_lch_generator_from_chord(chord).symbol].to_polynomial())
+            "lch_del": str(pd.lch_dga.differentials[pd.get_lch_generator_from_chord(chord).symbol].to_polynomial())
         }
         for chord in pd.chords]
-    rsft_generators = [
+    rsft_generators = None if pd.link_is_connected else [
         {
             "string": str(word),
             "grading": word.grading
         }
         for word in pd.rsft_generators
     ]
+    rsft_graded_by = None if pd.link_is_connected else str(pd.rsft_graded_by)
     template_context = {
         "pad": pad,
         "increment": increment,
@@ -84,13 +85,18 @@ def get_template_context(pd, increment=50, pad=10):
             for ls in line_segments],
         'knots': knots,
         'chords': chords,
-        'rsft_generators': rsft_generators,
         'n_disks': len(disk_corners),
         'disk_corners': disk_corners,
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],
         'y_labels': [{"label": y, "y": int(pad + increment * y + increment / 2)} for y in range(n_strands - 1)],
+        'lch_generators': pd.lch_dga.symbols,
         'lch_graded_by': str(pd.lch_graded_by),
-        'rsft_graded_by': str(pd.rsft_graded_by)
+        'lch_has_augs': len(pd.lch_dga.augmentations) > 0,
+        'lch_augs': pd.lch_dga.augmentations,
+        'lch_aug_gens': pd.lch_dga.augmentations[0].keys() if len(pd.lch_dga.augmentations) > 0 else None,
+        'link_is_connected': pd.link_is_connected,
+        'rsft_generators': rsft_generators,
+        'rsft_graded_by': rsft_graded_by
     }
     return template_context
 

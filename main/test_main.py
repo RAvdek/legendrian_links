@@ -1,7 +1,13 @@
+import json
 import unittest
 import sympy
 import dga
 import legendrian_links as ll
+
+
+def comparable_list_of_dicts(l):
+    # Have to convert to sets of json strings as we cannot make sets of dicts in TestCase.AssertEqual
+    return sorted([json.dumps({str(k): v for k, v in d.items()}, sort_keys=True) for d in l])
 
 
 class TestLinks(unittest.TestCase):
@@ -79,7 +85,7 @@ class TestAugsearch(unittest.TestCase):
             {x: 1, y: 1, z: 0},
             {x: 1, y: 1, z: 1}
         ]
-        self.assertEqual(results, expected_results)
+        self.assertEqual(comparable_list_of_dicts(results), comparable_list_of_dicts(expected_results))
 
     def test_hopf_link(self):
         x, y = sympy.symbols('x,y')
@@ -91,7 +97,7 @@ class TestAugsearch(unittest.TestCase):
             {x: 0, y: 0},
             {x: 0, y: 1}
         ]
-        self.assertEqual(results, expected_results)
+        self.assertEqual(comparable_list_of_dicts(results), comparable_list_of_dicts(expected_results))
 
 
 if __name__ == '__main__':

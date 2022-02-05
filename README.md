@@ -24,8 +24,6 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- We should not bother with RSFT algebras when the link is a knot. This means gutting some parts of the HTML in the knot case.
-- We should automatically run augsearch for the LCH algebra with Z/2Z coeffs and display retults in HTML.
 - Process disks into differentials for RSFT with Z/2Z coefficients and grading. Then put Z/2Z augs into HTML table.
 - Check if two augmentations are homotopic are not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Compute linearized homologies and put their Poincare polynomials into an HTML table.
@@ -42,7 +40,6 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 - dga.py test cases needed for more polynomials.
 - dga.py needs tests for differentials and DGA class methods.
-- Speed up `augsearch` by searching for variables which appear most frequently in a set of polynomials.
 - Add pylint or something to ensure code cleanliness.
 - Review relationships between data structures.
 - Make `legendrian_links` importable as a python library.

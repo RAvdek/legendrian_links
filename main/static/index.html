@@ -52,7 +52,7 @@ Knots with classical invariants:
   {% endfor %}
 </table>
 <br><br>
-Products of chords as lists of their x-coordinate:
+Chords are labeled by their x-coordinates:
 <br><br>
 <table>
   <tr>
@@ -60,7 +60,7 @@ Products of chords as lists of their x-coordinate:
     <th>Grading ({{ lch_graded_by }})</th>
     <th>From knot</th>
     <th>To knot</th>
-    <th>LCH del</th>
+    <th>LCH del (commutative with Z/2Z coeffs)</th>
   </tr>
   {% for chord in chords %}
   <tr>
@@ -73,6 +73,28 @@ Products of chords as lists of their x-coordinate:
   {% endfor %}
 </table>
 <br><br>
+{% if lch_has_augs %}
+Augmentations
+<br><br>
+<table>
+  <tr>
+    {% for g in lch_aug_gens %}
+    <th>{{ g }}</th>
+    {% endfor %}
+  </tr>
+  {% for aug in lch_augs %}
+  <tr>
+    {% for g in lch_aug_gens %}
+    <td>{{ aug[g] }}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+No non-trivial augmentations found
+{% endif %}
+<br><br>
+{% if not link_is_connected %}
 RSFT generators
 <br><br>
 <table>
@@ -87,6 +109,7 @@ RSFT generators
   </tr>
   {% endfor %}
 </table>
+{% endif %}
 <br><br>
 A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
