@@ -119,9 +119,9 @@ class DiskCorner(object):
     def to_dict(self):
         return {
             'x': self.chord.top_line_segment.x_left,
-            'y': self.chord.top_line_segment.y_left,
-            'from_knot': self.chord.bottom_line_segment.knot_label,
-            'to_knot': self.chord.top_line_segment.knot_label,
+            #'y': self.chord.top_line_segment.y_left,
+            #'from_knot': self.chord.bottom_line_segment.knot_label,
+            #'to_knot': self.chord.top_line_segment.knot_label,
             'corner': self.corner,
             'pos_neg': self.pos_neg
         }
@@ -241,7 +241,8 @@ class Disk(object):
 
     def _set_disk_corners(self):
         disk_corners = []
-        disk_segments = self.disk_segments
+        disk_segments = sorted(self.disk_segments, key=lambda disk_seg: disk_seg.x)
+        # To go CCW, left and down corners go left-to-right. Vice versa for up and right corners
         for ds in disk_segments:
             if ds.disk_corner is not None:
                 if ds.disk_corner.corner in ['l', 'd']:
@@ -349,7 +350,7 @@ class PlatSegment(object):
             disk_segments.append(
                 DiskSegment(
                     x=self.x,
-                    disk_corner=DiskCorner(chord=chord, corner='d'),
+                    disk_corner=DiskCorner(chord=chord, corner='u'),
                     top_right_ls=top_right_ls, top_left_ls=top_left_ls,
                     bottom_left_ls=ls, bottom_right_ls=ls
                 )

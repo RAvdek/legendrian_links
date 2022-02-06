@@ -21,7 +21,12 @@ class Differential(object):
         self.signs = signs
 
     def __repr__(self):
-        return str(self.summands)
+        if len(self.summands) == 0:
+            return str(0)
+        output_terms = []
+        for i in range(len(self.summands)):
+            output_terms.append('*'.join([str(f) for f in self.summands[i]]))
+        return " + ".join(output_terms)
 
     def to_polynomial(self):
         # When char(field) != 2, we have to worry about how the orders of the elements are multiplied, as minus signs
@@ -82,6 +87,8 @@ class DGA(object):
         of a marix representation of del. Say these linear equations are p_i. Since aug != 0 iff 1 in Im(aug), we see
         that aug restricted to ker is non-zero iff there is a solution to [p_1, ..., p_k, aug + 1]. This can be worked
         out with the equation solver using existence_only=True.
+
+        It would actually save time also to use transitivity to avoid checking all of the homotopy equiv classes.
 
         :param aug_1:
         :param aug_2:

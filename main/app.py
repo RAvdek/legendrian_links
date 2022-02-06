@@ -53,7 +53,7 @@ def get_template_context(pd, increment=50, pad=10):
             "grading": str(pd.get_lch_generator_from_chord(chord).grading),
             "from_knot": chord.bottom_line_segment.knot_label,
             "to_knot": chord.top_line_segment.knot_label,
-            "lch_del": str(pd.lch_dga.differentials[pd.get_lch_generator_from_chord(chord).symbol].to_polynomial())
+            "lch_del": str(pd.lch_dga.differentials[pd.get_lch_generator_from_chord(chord).symbol])
         }
         for chord in pd.chords]
     rsft_generators = None if pd.link_is_connected else [
