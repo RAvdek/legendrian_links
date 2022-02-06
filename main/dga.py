@@ -43,8 +43,26 @@ class Differential(object):
         return self.bilinearize(subs, subs)
 
     def bilinearize(self, subs_1, subs_2):
-        """Return linearized differential"""
-        raise NotImplementedError()
+        """Return bilinearized differential"""
+        # throw out contributions with 0 negative ends
+        bilin_signs = []
+        bilin_summands = []
+        for i in range(len(self.summands)):
+            if len(self.summands[i]) > 0:
+                bilin_signs.append(self.signs[i])
+                bilin_summands.append(self.summands[i])
+        output_signs = []
+        output_summands = []
+        for j in range(len(bilin_summands)):
+            sign = bilin_signs[i]
+            bs = bilin_summands[i]
+            for i in range(len(bs)):
+                aug_1_factor = 1 if i == 0 else prod(bs[:i]).subs(subs_1)
+                aug_2_factor = 1 if i == len(bs) - 1 else prod(bs[i+1:]).subs(subs_2)
+                output_signs.append(sign*aug_1_factor*aug_2_factor)
+                output_summands.append([bs[i]])
+        return Differential(summands=output_summands, coeff_mod=self.coeff_mod, signs=output_signs)
+
 
 class DGA(object):
 
@@ -75,6 +93,25 @@ class DGA(object):
             coeff_mod=ceoff_mod,
             grading_mod=grading_mod
         )
+
+    def get_verbose_subs_from_aug(self, aug):
+        """Extend aug to all the things it must be zero on
+
+        :param aug: dict
+        :return: dict
+        """
+        for s in self.symbols:
+            if s not in aug.keys():
+                aug[s] = 0
+        return aug
+
+    def get_bilin_differential(self, aug_1, aug_2):
+        subs_1 = self.get_verbose_subs_from_aug(aug_1)
+        subs_2 = self.get_verbose_subs_from_aug(aug_2)
+        return {
+            g: v.bilinearize(subs_1, subs_2)
+            for g, v in self.differentials.items()
+        }
 
     def are_homotopy_equivalent(self, aug_1, aug_2):
         """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field

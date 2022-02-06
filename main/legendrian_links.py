@@ -33,6 +33,9 @@ class Chord(object):
     def is_composable_with(self, chord):
         return self.top_line_segment.knot_label == chord.bottom_line_segment.knot_label
 
+    def is_pure(self):
+        return self.is_composable_with(self)
+
     def _set_xy(self):
         self.x = self.top_line_segment.x_left
         self.y = self.top_line_segment.y_left
@@ -257,9 +260,6 @@ class Disk(object):
 
     def is_lch(self):
         return len(self.pos_corners) == 1
-
-    def is_rsft(self):
-        raise NotImplementedError()
 
 
 class PlatSegment(object):
@@ -856,3 +856,16 @@ class PlatDiagram(object):
                         )
                     )
         self.rsft_generators = cyclic_composable_admissible_words
+
+    def _set_rsft_dga(self):
+        """We need to understand how each disk contributes to the RSFT del. This could be done by...
+        Taking each disk, and finding each possible extension to an RSFT generator by gluing on a generator at its
+        first puncture to a negative puncture of the disk.
+
+        If the negative puncture is pure, then there is a unique way to glue. Also, we have some control from the max
+        length of a word being equal to the number of components of the link.
+
+        Note also... the number of generators is very large, and so searching for augmentations will be very expensive.
+        However, we can reduce the number of inputs when working over Z/2Z by forgetting the cyclic ordering.
+        """
+        raise NotImplementedError()

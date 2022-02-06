@@ -24,9 +24,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- We should represent differentials as non-commutative in the HTML.
+- Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Process disks into differentials for RSFT with Z/2Z coefficients and grading. Then put Z/2Z augs into HTML table.
-- Check if two augmentations are homotopic are not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Compute linearized homologies and put their Poincare polynomials into an HTML table.
 - Introduce t coordinate in differentials. (This is not so important for augmentations where we can use t=1 for Z/2Z coeffs).
 - Ability to flip orientations of link components.
