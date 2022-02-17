@@ -64,6 +64,8 @@ def get_template_context(pd, increment=50, pad=10):
         for word in pd.rsft_generators
     ]
     rsft_graded_by = None if pd.link_is_connected else str(pd.rsft_graded_by)
+    lch_aug_gens = sorted(pd.lch_dga.augmentations[0].keys(), key=lambda g: str(g)) \
+        if len(pd.lch_dga.augmentations) > 0 else None
     template_context = {
         "pad": pad,
         "increment": increment,
@@ -93,7 +95,7 @@ def get_template_context(pd, increment=50, pad=10):
         'lch_graded_by': str(pd.lch_graded_by),
         'lch_has_augs': len(pd.lch_dga.augmentations) > 0,
         'lch_augs': pd.lch_dga.augmentations,
-        'lch_aug_gens': pd.lch_dga.augmentations[0].keys() if len(pd.lch_dga.augmentations) > 0 else None,
+        'lch_aug_gens': lch_aug_gens,
         'link_is_connected': pd.link_is_connected,
         'rsft_generators': rsft_generators,
         'rsft_graded_by': rsft_graded_by
