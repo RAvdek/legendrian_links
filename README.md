@@ -24,9 +24,10 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Process disks into differentials for RSFT with Z/2Z coefficients and grading. Then put Z/2Z augs into HTML table.
-- Compute linearized homologies and put their Poincare polynomials into an HTML table.
+- Create ChainComplex class which we'll use to store bilinearized invariants. We only care to work with bounded complexes over QQ or finite fields so that homology groups will be determined by their ranks. In this case, we can store kernels of differentials and compute betti numbers as b_n = dim ker del_n - dim im del_{n-1} = dim ker del_n + rank C_{n-1} - dim ker del_{n-1}. Note that computing dimensions of kernels in sympy is not already built. It seems we'd need to develop an rref algorithm by hand for finite fields.
+- Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
+- Put bilinearized homologies of Poincare polynomials into an HTML table.
 - Introduce t coordinate in differentials. (This is not so important for augmentations where we can use t=1 for Z/2Z coeffs).
 - Ability to flip orientations of link components.
 - Ability to reverse orientations on link components.

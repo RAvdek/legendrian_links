@@ -220,6 +220,11 @@ def finite_field_elements(modulus):
     return [n for n in range(modulus)]
 
 
+def is_linear(poly):
+    monom_orders = [sum(m) for m in poly.monoms()]
+    return all([mo == 1 for mo in monom_orders])
+
+
 def highest_frequency_symbol(polys, symbols):
     # Ensure that the order of symbols in input match those in polys by re-initializing
     polys = [sympy.Poly(p, *symbols) for p in polys]

@@ -9,6 +9,7 @@ verify_ssl = true
 flask = "*"
 jinja2 = "*"
 sympy = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.9"

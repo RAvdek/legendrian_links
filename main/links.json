@@ -13,5 +13,10 @@
     "comment": "Right handed trefoil",
     "n_strands": 4,
     "front_crossings": [1, 1, 1]
+  },
+  "polyfillable": {
+    "comment": "Polyfillable link from https://arxiv.org/abs/1307.7998",
+    "n_strands": 6,
+    "front_crossings": [3, 1, 2, 2, 1, 3, 3]
   }
 }
