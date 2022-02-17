@@ -1,8 +1,10 @@
 import json
 import unittest
+import numpy as np
 import sympy
 import dga
 import legendrian_links as ll
+from matrix import Matrix
 
 
 def comparable_list_of_dicts(l):
@@ -98,6 +100,17 @@ class TestAugsearch(unittest.TestCase):
             {x: 0, y: 1}
         ]
         self.assertEqual(comparable_list_of_dicts(results), comparable_list_of_dicts(expected_results))
+
+
+class TestMatrix(unittest.TestCase):
+
+    def test_modulus(self):
+        self.assertFalse(
+            np.any(Matrix([[4]], coeff_modulus=3).values - Matrix([[1]], coeff_modulus=3).values)
+        )
+        self.assertFalse(
+            np.any(Matrix([[1, 2], [2, 2]], coeff_modulus=2).values - Matrix([[1, 0], [0, 0]], coeff_modulus=2).values)
+        )
 
 
 if __name__ == '__main__':

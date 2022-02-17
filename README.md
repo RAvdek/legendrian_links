@@ -39,6 +39,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Cleanup, performance, and testing
 
+- Tests for different modules should have their own files.
+- More test cases for matrices.
 - dga.py test cases needed for more polynomials.
 - dga.py needs tests for differentials and DGA class methods.
 - Add pylint or something to ensure code cleanliness.
