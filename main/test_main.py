@@ -2,9 +2,9 @@ import json
 import unittest
 import numpy as np
 import sympy
-import dga
+import polynomials
 import legendrian_links as ll
-from matrix import Matrix
+from algebra import Matrix
 
 
 def comparable_list_of_dicts(l):
@@ -79,7 +79,7 @@ class TestAugsearch(unittest.TestCase):
         x, y, z = sympy.symbols('x,y,z')
         symbols = [x, y, z]
         polys = [1 + x + z + x * y * z]
-        results = dga.zero_set(polys=polys, symbols=symbols, modulus=2)
+        results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2)
         expected_results = [
             {x: 0, z: 1, y: 0},
             {x: 0, z: 1, y: 1},
@@ -93,7 +93,7 @@ class TestAugsearch(unittest.TestCase):
         x, y = sympy.symbols('x,y')
         symbols = [x, y]
         polys = [y * x]
-        results = dga.zero_set(polys=polys, symbols=symbols, modulus=2)
+        results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2)
         expected_results = [
             {x: 1, y: 0},
             {x: 0, y: 0},

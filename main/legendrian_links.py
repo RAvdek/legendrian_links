@@ -1,6 +1,7 @@
 from collections import Counter
+from math import prod
 import sympy
-import dga
+import algebra
 import utils
 
 
@@ -69,7 +70,7 @@ class LCHGenerator(object):
             self.grading = 0 if self.chord.sign == 1 else 1
 
     def _set_symbol(self):
-        self.symbol = sympy.Symbol(str(self))
+        self.symbol = sympy.Symbol(str(self), commutative=False)
 
 
 class RSFTGenerator(object):
@@ -798,8 +799,7 @@ class PlatDiagram(object):
 
     def _set_lch_dga(self):
         lch_disks = [d for d in self.disks if d.is_lch()]
-        lch_del = {g.symbol: [] for g in self.lch_generators}
-        lch_del_signs = {g.symbol: [] for g in self.lch_generators}
+        lch_del = {g: 0 for g in self.lch_generators}
         for d in lch_disks:
             disk_corners = d.disk_corners.copy()
             # cyclically rotate disk until positive corner is in the last (-1) position
@@ -807,21 +807,20 @@ class PlatDiagram(object):
                 last_corner = disk_corners.pop(-1)
                 disk_corners = [last_corner] + disk_corners
             pos_chord = disk_corners.pop().chord
-            pos_generator = self.get_lch_generator_from_chord(pos_chord).symbol
+            pos_generator = self.get_lch_generator_from_chord(pos_chord)
             if len(disk_corners) > 0:
                 neg_word = [self.get_lch_generator_from_chord(dc.chord).symbol for dc in disk_corners]
             else:
                 neg_word = [1]
             # Add negative word of chords as a summand to the LCH
-            lch_del[pos_generator].append(neg_word)
-            lch_del_signs[pos_generator].append(1)
+            # TODO: Add sign contributions
+            lch_del[pos_generator] += prod(neg_word)
         lch_del = {
-            g: dga.Differential(summands=lch_del[g], signs=lch_del_signs[g])
+            g.symbol: algebra.Differential(lch_del[g])
             for g in lch_del.keys()
         }
-
         gradings = {g.symbol: g.grading for g in self.lch_generators}
-        self.lch_dga = dga.DGA(gradings=gradings, differentials=lch_del, coeff_mod=2)
+        self.lch_dga = algebra.DGA(gradings=gradings, differentials=lch_del, coeff_mod=2)
 
     def _set_rsft_generators(self):
         # length 1 composable words
