@@ -37,52 +37,82 @@ class Differential(object):
 
 
 class Matrix(object):
+    """Attributes:
 
-    def __init__(self, values, coeff_modulus=0):
+    lazy_ref: If False, compute row echelon form upon initialization
+    values: np.array
+    n_rows:
+    n_cols:
+    coeff_modulus: Consider as matrix with coeffs modulus this number
+    ref: Row echelon form
+    ref_q: Matrix q such that q*ref = self
+    ref_q_inv: Inverse of ref_q
+    rank_im: Dimension of the image
+    rank_ker: Dimension of the kernel
+    """
+
+    def __init__(self, values, coeff_modulus=0, lazy_ref=False):
+        self.lazy_ref = lazy_ref
         self.values = np.array(values)
         self.n_rows = self.values.shape[0]
         self.n_cols = self.values.shape[1]
         self.coeff_modulus = coeff_modulus
         if coeff_modulus != 0:
             self.values %= self.coeff_modulus
+        self.ref = None
+        self.ref_q = None
+        self.ref_q_inv = None
+        self.rank_im = None
+        self.rank_ker = None
+        if not lazy_ref:
+            self.set_row_echelon()
 
     def __repr__(self):
         return str(self.values)
 
-    def kernel_image(self):
-        B, Q, Qi, k = self.row_echelon()
-        return Qi.T[:, k:], B.T[:, :k]
+    def multiply(self, other):
+        if not isinstance(other, Matrix):
+            raise ValueError(f"Trying to multiply matrix with {other.__class__}")
+        if not self.coeff_modulus == other.coeff_modulus:
+            raise ValueError(f"Trying to multiply matrix having coeff_modulus={self.coeff_modulus} "
+                             f"with other having coeff_modulus={other.coeff_modulus}")
+        values = np.matmul(self.values, other.values)
+        return Matrix(values=values, coeff_modulus=self.coeff_modulus, lazy_ref=self.lazy_ref)
 
-    def row_echelon(self):
-        B = self.values.copy()
-        Q = np.identity(self.n_rows)
-        Qi = np.identity(self.n_rows)
+    def set_row_echelon(self):
+        ref = self.values.copy()
+        q = np.identity(self.n_rows)
+        q_inv = np.identity(self.n_rows)
         k = 0
         l = 0
         while k < self.n_rows:
-            while l < self.n_cols and not (np.any(B[k:, l])):
+            while l < self.n_cols and not (np.any(ref[k:, l])):
                 l += 1
             if l == self.n_cols:
                 break
-            B, Q, Qi = self._row_reduce(B, Q, Qi, k, l)
+            ref, q, q_inv = self._row_reduce(ref, q, q_inv, k, l)
             k += 1
-        return B, Q, Qi, k
+        self.ref = Matrix(ref, coeff_modulus=self.coeff_modulus, lazy_ref=True)
+        self.ref_q = Matrix(q, coeff_modulus=self.coeff_modulus, lazy_ref=True)
+        self.ref_q_inv = Matrix(q_inv, coeff_modulus=self.coeff_modulus, lazy_ref=True)
+        self.rank_im = k
+        self.rank_ker = self.n_cols - k
 
     def is_square(self):
         return self.n_rows == self.n_cols
 
-    def _row_reduce(self, B, Q, Qi, k, l):
-        while np.any(B[k + 1:, l]):
-            B, Q, Qi = self._row_prepare(B, Q, Qi, k, l)
-            B, Q, Qi = self._partial_row_reduce(B, Q, Qi, k, l)
-        return B, Q, Qi
+    def _row_reduce(self, ref, q, q_inv, k, l):
+        while np.any(ref[k + 1:, l]):
+            ref, q, q_inv = self._row_prepare(ref, q, q_inv, k, l)
+            ref, q, q_inv = self._partial_row_reduce(ref, q, q_inv, k, l)
+        return ref, q, q_inv
 
-    def _row_prepare(self, B, Q, Qi, k, l):
-        (a, i) = self._smallest_nonzero_index(B[:, l], k)
-        B[[i, k], :] = B[[k, i], :]
-        Qi[[i, k], :] = Qi[[k, i], :]  # row swap
-        Q[:, [i, k]] = Q[:, [k, i]]  # column swap
-        return B, Q, Qi
+    def _row_prepare(self, ref, q, q_inv, k, l):
+        (a, i) = self._smallest_nonzero_index(ref[:, l], k)
+        ref[[i, k], :] = ref[[k, i], :]
+        q_inv[[i, k], :] = q_inv[[k, i], :]  # row swap
+        q[:, [i, k]] = q[:, [k, i]]  # column swap
+        return ref, q, q_inv
 
     @staticmethod
     def _smallest_nonzero_index(v, k):
