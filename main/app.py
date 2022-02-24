@@ -37,10 +37,6 @@ KNOT_ORIENTATIONS_TO_ARROW = {
 
 def get_template_context(pd):
     disk_corners = pd.disk_corners
-    knots = pd.knots
-    for k in range(len(knots)):
-        knots[k]["label"] = k
-        knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
     chords = [
         {
             "string": str(pd.get_lch_generator_from_chord(chord)),
@@ -55,7 +51,6 @@ def get_template_context(pd):
         dgas.append(get_dga_context(pd.rsft_dga, name="RSFT"))
     template_context = {
         'svg_context': get_diagram_context(pd),
-        'knots': knots,
         'chords': chords,
         'n_disks': len(disk_corners),
         'disk_corners': disk_corners,
@@ -65,12 +60,17 @@ def get_template_context(pd):
 
 
 def get_diagram_context(pd, increment=50, pad=10):
+    knots = pd.knots
+    for k in range(len(knots)):
+        knots[k]["label"] = k
+        knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
     n_strands = pd.n_strands
     n_segments = len(pd.plat_segments)
     height = increment * n_strands + pad
     width = (increment * n_segments) + pad + increment
     line_segments = pd.get_line_segment_array()
     output = {
+        "knots": knots,
         "pad": pad,
         "increment": increment,
         "height": height,

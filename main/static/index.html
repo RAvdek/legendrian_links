@@ -10,29 +10,6 @@ Lagrangian resolution of the plat:
 {% import "svg_macro.html" as svg %}
 {{ svg.diagram(svg_context) }}
 <br><br>
-Knots with classical invariants:
-<br><br>
-<table>
-  <tr>
-    <th>Label</th>
-    <th>Color</th>
-    <th>tb</th>
-    <th>rot</th>
-  </tr>
-  {% for knot in knots %}
-  <tr>
-    <td>{{ knot["label"] }}</td>
-    <td>
-      <svg width="14" height="14">
-        <circle cx="7" cy="7" r="7" fill="rgb({{ knot['rgb'][0] }},{{ knot['rgb'][1] }},{{ knot['rgb'][2] }})" />
-      </svg>
-    </td>
-    <td>{{ knot["tb"] }}</td>
-    <td>{{ knot["rot"] }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<br><br>
 Chords are labeled by their x-coordinates:
 <br><br>
 <table>
@@ -53,7 +30,9 @@ Chords are labeled by their x-coordinates:
 {% import "dga_macro.html" as dga_macro %}
 {% for ctx in dgas %}
 {{ dga_macro.dga(ctx) }}
+{% if not loop.last %}<br><br>{% endif %}
 {% endfor %}
+<br><br>
 A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
 {% for d in disk_corners %}

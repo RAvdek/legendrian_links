@@ -10,7 +10,7 @@
   </text>
   {% endfor %}
   {% for thing in ctx["x_labels"] %}
-    <text x="{{ thing['x'] }}" y="{{ height }}">
+    <text x="{{ thing['x'] }}" y="{{ ctx["height"] }}">
       {{ thing["label"] }}
     </text>
   {% endfor %}
@@ -20,4 +20,28 @@
     </text>
   {% endfor %}
 </svg>
+<br><br>
+Knots with classical invariants:
+<br><br>
+<table>
+  <tr>
+    <th>Label</th>
+    <th>Color</th>
+    <th>tb</th>
+    <th>rot</th>
+  </tr>
+  {% for knot in ctx["knots"] %}
+  <tr>
+    <td>{{ knot["label"] }}</td>
+    <td>
+      <svg width="14" height="14">
+        <circle cx="7" cy="7" r="7" fill="rgb({{ knot['rgb'][0] }},{{ knot['rgb'][1] }},{{ knot['rgb'][2] }})" />
+      </svg>
+    </td>
+    <td>{{ knot["tb"] }}</td>
+    <td>{{ knot["rot"] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
 {%- endmacro %}
