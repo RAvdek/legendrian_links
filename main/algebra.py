@@ -71,6 +71,11 @@ class Matrix(object):
         return str(self.values)
 
     def multiply(self, other):
+        """Multiply self with another Matrix. Must have appropriate dimensions and have the same coeff modulus.
+
+        :param other: Other instance of Matrix
+        :return: Matrix
+        """
         if not isinstance(other, Matrix):
             raise ValueError(f"Trying to multiply matrix with {other.__class__}")
         if not self.coeff_modulus == other.coeff_modulus:
@@ -80,6 +85,10 @@ class Matrix(object):
         return Matrix(values=values, coeff_modulus=self.coeff_modulus, lazy_ref=self.lazy_ref)
 
     def set_row_echelon(self):
+        """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
+
+        :return: None
+        """
         ref = self.values.copy()
         q = np.identity(self.n_rows)
         q_inv = np.identity(self.n_rows)
@@ -124,20 +133,20 @@ class Matrix(object):
         except:
             return 0, np.nan  # minNonZero causes this sometimes
 
-    def _partial_row_reduce(self, B, Q, Qi, k, l):
-        for i in range(k + 1, Q.shape[0]):
-            q = (B[i, l] // B[k, l])
+    def _partial_row_reduce(self, ref, q, q_inv, k, l):
+        for i in range(k + 1, q.shape[0]):
+            q = (ref[i, l] // ref[k, l])
             if self.coeff_modulus != 0:
                 q %= self.coeff_modulus
             # row add i,k,-q
-            B[i] += (-q * B[k])
-            Qi[i] += (-q * Qi[k])  # row add
-            Q[:, k] += (q * Q[:, i])  # column add (note i,k are switched)
+            ref[i] += (-q * ref[k])
+            q_inv[i] += (-q * q_inv[k])  # row add
+            q[:, k] += (q * q[:, i])  # column add (note i,k are switched)
             if self.coeff_modulus != 0:
-                B[i] %= self.coeff_modulus
-                Qi[i] %= self.coeff_modulus
-                Q[:, k] %= self.coeff_modulus
-        return B, Q, Qi
+                ref[i] %= self.coeff_modulus
+                q_inv[i] %= self.coeff_modulus
+                q[:, k] %= self.coeff_modulus
+        return ref, q, q_inv
 
 
 class LinearMap(object):
@@ -260,7 +269,8 @@ class DGA(DGBase):
         """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field
         given by aug = (aug_1 - aug_2) is zero. How do we figure this out using only generators of the underlying vector
         spaces of generators? Since aug(del(x)) always vanishes, it is already zero on Image(del). Therefore aug == 0
-        on homology iff it vanishes on ker del.
+        on homology iff it vanishes on ker del. Another way to check is if the lin homologies agree and if the bilin
+        homologies agree with those of the lin homologies.
 
         This is actually annoying to do in sympy and easy to do in sage :(
         However, we can do a trick... Represent ker as the intersection of the varieties determined by the row vectors
@@ -304,6 +314,7 @@ class DGA(DGBase):
         # Set all non-zero graded elements to zero.
         zero_substitutions = {g: 0 for g in self.symbols if self.gradings[g] != 0}
         # Make polynomials in commutative variables of the deg=0 generators.
+        # This is required to apply zero_set which only works with commuting variables!
         polys = []
         for exp in d_expressions:
             polys.append(sympy.sympify(exp).subs(zero_substitutions))
