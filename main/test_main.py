@@ -72,6 +72,40 @@ class TestLinks(unittest.TestCase):
     def test_trefoil(self):
         self._test_link(4, [1]*3, 1, 10, tb_rot=[1, [0]], lch_gradings={0, 1})
 
+    def test_composable(self):
+        trefoil = ll.PlatDiagram(n_strands=4, front_crossings=[1, 1, 1])
+        chord_1 = trefoil.get_chord_from_x(1)
+        chord_2 = trefoil.get_chord_from_x(2)
+        self.assertTrue(chord_1.is_composable_with(chord_1))
+        self.assertTrue(chord_1.is_composable_with(chord_2))
+
+        hopf = ll.PlatDiagram(n_strands=4, front_crossings=[1, 1])
+        chord_1 = hopf.get_chord_from_x(1)
+        chord_2 = hopf.get_chord_from_x(2)
+        self.assertFalse(chord_1.is_composable_with(chord_1))
+        self.assertTrue(chord_1.is_composable_with(chord_2))
+
+    def test_word_is_admissible(self):
+        trefoil = ll.PlatDiagram(n_strands=4, front_crossings=[1, 1, 1])
+        chord_1 = trefoil.get_chord_from_x(1)
+        chord_2 = trefoil.get_chord_from_x(2)
+        self.assertTrue(trefoil.word_is_admissible([chord_1]))
+        self.assertFalse(trefoil.word_is_admissible([chord_1, chord_1]))
+        self.assertFalse(trefoil.word_is_admissible([chord_1, chord_2]))
+
+        hopf = ll.PlatDiagram(n_strands=4, front_crossings=[1, 1])
+        chord_1 = hopf.get_chord_from_x(1)
+        chord_2 = hopf.get_chord_from_x(2)
+        self.assertTrue(hopf.word_is_admissible([chord_1], cyclic=False))
+        self.assertFalse(hopf.word_is_admissible([chord_1], cyclic=True))
+        self.assertTrue(hopf.word_is_admissible([chord_1, chord_2], cyclic=True))
+        self.assertTrue(hopf.word_is_admissible([chord_1, chord_2], cyclic=False))
+        self.assertFalse(hopf.word_is_admissible([chord_1, chord_1], cyclic=True))
+        self.assertFalse(hopf.word_is_admissible([chord_1, chord_1], cyclic=False))
+        self.assertFalse(hopf.word_is_admissible([chord_1, chord_2, chord_1], cyclic=False))
+        self.assertFalse(hopf.word_is_admissible([chord_1, chord_2, chord_1], cyclic=True))
+        self.assertFalse(hopf.word_is_admissible([chord_1, chord_2, chord_1, chord_2], cyclic=True))
+
 
 class TestAugsearch(unittest.TestCase):
 

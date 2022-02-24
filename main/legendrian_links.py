@@ -134,12 +134,14 @@ class DiskCorner(object):
         self.corner = corner
         self.pos_neg = self.CORNER_TYPES[self.corner]
 
+    def __repr__(self):
+        return str(self.to_dict())
+
     def to_dict(self):
         return {
             'x': self.chord.top_line_segment.x_left,
-            #'y': self.chord.top_line_segment.y_left,
-            #'from_knot': self.chord.bottom_line_segment.knot_label,
-            #'to_knot': self.chord.top_line_segment.knot_label,
+            'from_knot': self.chord.bottom_line_segment.knot_label,
+            'to_knot': self.chord.top_line_segment.knot_label,
             'corner': self.corner,
             'pos_neg': self.pos_neg
         }
@@ -253,6 +255,9 @@ class Disk(object):
     def __init__(self, disk_segments):
         self.disk_segments = disk_segments
         self._set_disk_corners()
+
+    def __repr__(self):
+        return str([str(dc) for dc in self.disk_corners])
 
     def get_endpoints(self):
         return [ds.get_endpoint_y_values() for ds in self.disk_segments]
@@ -580,6 +585,12 @@ class PlatDiagram(object):
             raise RuntimeError(f"Found {n_results} possible capping paths for"
                                f"start_chord={start_chord} and"
                                f"end_chord={end_chord}")
+        return search_results[0]
+
+    def get_chord_from_x(self, x):
+        search_results = [c for c in self.chords if c.x == x]
+        if len(search_results) != 1:
+            raise ValueError(f"{len(search_results)} possible chords found with x={x}")
         return search_results[0]
 
     def get_lch_generator_from_chord(self, chord):
@@ -916,23 +927,23 @@ class PlatDiagram(object):
         def all_chords_positive(ext):
             return all([a['pos_neg'] == '+' for a in ext['asymptotics']])
 
-        def non_repeating_knots_at_pos_endpoints(ext):
-            pos_knot_labels = [a['knot_label'] for a in ext['asymptotics'] if a['pos_neg'] == '+']
-            return utils.is_nonrepeating(pos_knot_labels)
+        def extension_is_admissible(ext, cyclic):
+            return self.word_is_admissible(
+                [a['chord'] for a in ext['asymptotics'] if a['pos_neg'] == '+'],
+                cyclic=cyclic
+            )
 
         for d in disks:
             d_asymptotics = [
                 {
                     'chord': dc.chord,
                     'pos_neg': dc.pos_neg,
-                    'knot_label': (
-                        dc.chord.top_line_segment.knot_label if dc.pos_neg == '+'
-                        else dc.chord.top_line_segment.knot_label
-                    )
+                    'to_knot_label': dc.chord.top_line_segment.knot_label,
+                    'from_knot_label': dc.chord.bottom_line_segment.knot_label
                 }
                 for dc in d.disk_corners
             ]
-            if any([a['knot_label'] is None for a in d_asymptotics]):
+            if any([a['from_knot_label'] is None for a in d_asymptotics]):
                 raise RuntimeError("Knot labels yet not initialized")
             n_neg_punctures = len([a for a in d_asymptotics if a['pos_neg'] == '-'])
 
@@ -942,10 +953,14 @@ class PlatDiagram(object):
                 "asymptotics": d_asymptotics,
                 "output_words": []
             }]
+            while_c_1 = 0
             while not all([all_chords_positive(ext) for ext in extensions]):
+                while_c_1 +=1
+                if while_c_1 % 1000 == 0:
+                    LOG.info(f"while {while_c_1} @ 949: {d}")
                 updated_extensions = []
                 for ext in extensions:
-                    if all_chords_positive(ext) and non_repeating_knots_at_pos_endpoints(ext):
+                    if all_chords_positive(ext) and extension_is_admissible(ext, cyclic=False):
                         updated_extensions.append(ext)
                     else:
                         asymptotics = ext['asymptotics']
@@ -955,6 +970,8 @@ class PlatDiagram(object):
                         possible_extensions = [
                             g.word for g in self.rsft_generators
                             if g.word[0] == first_neg_chord]
+                        if while_c_1 % 1000 == 0:
+                            LOG.info(f"while {while_c_1} @ 968: {possible_extensions}")
                         for poss_ext_word in possible_extensions:
                             new_asymptotics = asymptotics[:least_neg_index]
                             new_asymptotics += [
@@ -965,15 +982,15 @@ class PlatDiagram(object):
                                 }
                                 for chord in poss_ext_word[1:]
                             ]
-                            new_asymptotics += asymptotics[least_neg_index:]
+                            new_asymptotics += asymptotics[least_neg_index+1:]
                             new_output_words = ext["output_words"] + [poss_ext_word]
                             new_ext = {
                                 "asymptotics": new_asymptotics,
                                 "output_words": new_output_words
                             }
-                            if non_repeating_knots_at_pos_endpoints(new_ext):
+                            if extension_is_admissible(new_ext, cyclic=False):
                                 updated_extensions.append(new_ext)
-                extensions = updated_extensions
+                extensions = [ext for ext in updated_extensions if extension_is_admissible(ext, cyclic=True)]
             # At this point we have all extensions of the disk to cyclic words of chords.
             # Now we want to cyclically rotate the input words in all possible ways
             # and add these to our differentials.
@@ -981,7 +998,9 @@ class PlatDiagram(object):
                 for i in range(len(ext['asymptotics'])):
                     input_word = utils.rotate([a['chord'] for a in ext['asymptotics']], i)
                     first_input_chord = input_word[0]
-                    input_generator = self.get_rsft_generator_from_word(input_word)
+                    input_generator = self.get_rsft_generator_from_word(input_word, raise_if_not_found=False)
+                    if input_generator is None:
+                        continue
                     if n_neg_punctures == 0:
                         # if there are no negative chords, then we contribute 1 to the differential
                         rsft_del[input_generator] += 1
@@ -990,19 +1009,36 @@ class PlatDiagram(object):
                         if first_input_chord in [a['chord'] for a in d_asymptotics if a['pos_neg'] == '+']:
                             # if the first chord of the input word is in the holo disk, rotate the output words until
                             # the first chord of the first output word agrees with the next negative puncture
+                            while_c_2 = 0
                             while d_asymptotics[0]["chord"] != first_input_chord:
+                                while_c_2 += 1
+                                if while_c_2 % 1000 == 0:
+                                    LOG.info(f"while {while_c_2} @ 1008")
                                 d_asymptotics = utils.rotate(d_asymptotics, 1)
-                            first_neg_chord_of_d = [a for a in d_asymptotics if a['pos_neg'] == '-'][0]
+                            first_neg_chord_of_d = [a["chord"] for a in d_asymptotics if a['pos_neg'] == '-'][0]
+                            while_c_3 = 0
                             while output_words[0][0] != first_neg_chord_of_d:
+                                while_c_3 += 1
+                                if while_c_3 % 1000 == 0:
+                                    LOG.info(f"while {while_c_3} @ 1015: {output_words[0][0]} != {first_neg_chord_of_d}")
                                 output_words = utils.rotate(output_words, 1)
                         else:
                             # if the first chord in the input word is in one of the output words...
+                            while_c_4 = 0
                             while first_input_chord not in output_words[0]:
+                                while_c_4 += 1
+                                if while_c_4 % 1000 == 0:
+                                    LOG.info(f"while {while_c_4} @ 1023")
                                 output_words = utils.rotate(output_words, 1)
+                            while_c_5 = 0
                             while first_input_chord != output_words[0][0]:
+                                while_c_5 += 1
+                                if while_c_5 % 1000 == 0:
+                                    LOG.info(f"while {while_c_5} @ 1029")
                                 output_words[0] = utils.rotate(output_words[0], 1)
+                        LOG.info(output_words)
                         output_symbols = [self.get_rsft_generator_from_word(w).symbol for w in output_words]
-                        output_monomial = prod([output_symbols])
+                        output_monomial = prod(output_symbols)
                         rsft_del[input_generator] += output_monomial
         rsft_del = {
             g.symbol: algebra.Differential(rsft_del[g])
