@@ -498,6 +498,7 @@ class PlatDiagram(object):
             self._set_composable_admissible_words()
             self._set_rsft_graded_by()
             self._set_rsft_generators()
+            self._set_rsft_dga()
 
     def get_line_segment_array(self):
         return [
@@ -925,7 +926,7 @@ class PlatDiagram(object):
                     'chord': dc.chord,
                     'pos_neg': dc.pos_neg,
                     'knot_label': (
-                        dc.chord.top_line_segment.knot_label if dc.chord.pos_neg == '+'
+                        dc.chord.top_line_segment.knot_label if dc.pos_neg == '+'
                         else dc.chord.top_line_segment.knot_label
                     )
                 }

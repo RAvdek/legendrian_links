@@ -1,0 +1,23 @@
+{% macro diagram(ctx) -%}
+<svg height="{{ ctx["height"] }}" width="{{ ctx["width"] }}">
+  {% for line in ctx["lines"] %}
+  <line
+    x1="{{ line['start_xy'][0] }}" y1="{{ line['start_xy'][1] }}" x2="{{ line['end_xy'][0] }}" y2="{{ line['end_xy'][1] }}"
+    style="stroke:rgb({{ line['rgb'][0] }},{{ line['rgb'][1] }},{{ line['rgb'][2] }});stroke-width:4"
+  />
+  <text x="{{ line['label']['x'] }}" y="{{ line['label']['y'] }}">
+      {{ line['label']['marker'] }}
+  </text>
+  {% endfor %}
+  {% for thing in ctx["x_labels"] %}
+    <text x="{{ thing['x'] }}" y="{{ height }}">
+      {{ thing["label"] }}
+    </text>
+  {% endfor %}
+  {% for thing in ctx["y_labels"] %}
+    <text x="{{ pad }}" y="{{ thing['y'] }}">
+      {{ thing["label"] }}
+    </text>
+  {% endfor %}
+</svg>
+{%- endmacro %}

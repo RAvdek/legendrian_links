@@ -5,7 +5,7 @@ from flask import (
     request,
     redirect,
     url_for)
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader, Template
 import utils
 import legendrian_links as ll
 
@@ -15,9 +15,8 @@ DEFAULT_LINK_KEY = 'm10_132_nv'
 # Static resources
 STATIC_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'static')
-HTML_PATH = os.path.join(STATIC_PATH, 'index.html')
-with open(HTML_PATH) as f:
-    INDEX_TEMPLATE = Template(f.read())
+JINJA_ENV = Environment(loader=FileSystemLoader(STATIC_PATH))
+INDEX_TEMPLATE = JINJA_ENV.get_template('index.html')
 
 # App resources
 APP = Flask(__name__)
@@ -36,12 +35,7 @@ KNOT_ORIENTATIONS_TO_ARROW = {
 }
 
 
-def get_template_context(pd, increment=50, pad=10):
-    n_strands = pd.n_strands
-    n_segments = len(pd.plat_segments)
-    height = increment * pd.n_strands + pad
-    width = (increment * n_segments) + pad + increment
-    line_segments = pd.get_line_segment_array()
+def get_template_context(pd):
     disk_corners = pd.disk_corners
     knots = pd.knots
     for k in range(len(knots)):
@@ -56,17 +50,27 @@ def get_template_context(pd, increment=50, pad=10):
             "lch_del": str(pd.lch_dga.differentials[pd.get_lch_generator_from_chord(chord).symbol])
         }
         for chord in pd.chords]
-    rsft_generators = None if pd.link_is_connected else [
-        {
-            "string": str(word),
-            "grading": word.grading
-        }
-        for word in pd.rsft_generators
-    ]
-    rsft_graded_by = None if pd.link_is_connected else str(pd.rsft_graded_by)
-    lch_aug_gens = sorted(pd.lch_dga.augmentations[0].keys(), key=lambda g: str(g)) \
-        if len(pd.lch_dga.augmentations) > 0 else None
+    dgas = [get_dga_context(pd.lch_dga, name="LCH")]
+    if not pd.link_is_connected:
+        dgas.append(get_dga_context(pd.rsft_dga, name="RSFT"))
     template_context = {
+        'svg_context': get_diagram_context(pd),
+        'knots': knots,
+        'chords': chords,
+        'n_disks': len(disk_corners),
+        'disk_corners': disk_corners,
+        'dgas': dgas
+    }
+    return template_context
+
+
+def get_diagram_context(pd, increment=50, pad=10):
+    n_strands = pd.n_strands
+    n_segments = len(pd.plat_segments)
+    height = increment * n_strands + pad
+    width = (increment * n_segments) + pad + increment
+    line_segments = pd.get_line_segment_array()
+    output = {
         "pad": pad,
         "increment": increment,
         "height": height,
@@ -84,23 +88,35 @@ def get_template_context(pd, increment=50, pad=10):
                     'marker': KNOT_ORIENTATIONS_TO_ARROW[ls['orientation']] if ls['t_label'] else ''
                 }
             }
-            for ls in line_segments],
-        'knots': knots,
-        'chords': chords,
-        'n_disks': len(disk_corners),
-        'disk_corners': disk_corners,
+            for ls in line_segments
+        ],
         'x_labels': [{"label": x, "x": int(increment + increment * x + increment / 2)} for x in range(n_segments)],
         'y_labels': [{"label": y, "y": int(pad + increment * y + increment / 2)} for y in range(n_strands - 1)],
-        'lch_generators': pd.lch_dga.symbols,
-        'lch_graded_by': str(pd.lch_graded_by),
-        'lch_has_augs': len(pd.lch_dga.augmentations) > 0,
-        'lch_augs': pd.lch_dga.augmentations,
-        'lch_aug_gens': lch_aug_gens,
-        'link_is_connected': pd.link_is_connected,
-        'rsft_generators': rsft_generators,
-        'rsft_graded_by': rsft_graded_by
     }
-    return template_context
+    return output
+
+
+def get_dga_context(dga, name):
+    output = dict()
+    output["name"] = name
+    output["grading_mod"] = dga.grading_mod
+    output["coeff_mod"] = dga.coeff_mod
+    generators = [
+        {
+            "symbol": g,
+            "name": str(g),
+            "grading": dga.gradings[g],
+            "del": str(dga.differentials[g])
+        }
+        for g in dga.symbols
+    ]
+    generators = sorted(generators, key=lambda g: g["name"])
+    output["generators"] = generators
+    output["has_augs"] = len(dga.augmentations) > 0
+    deg_0_gens = [g for g in generators if g["grading"] == 0]
+    output["deg_0_gens"] = deg_0_gens
+    output["augs"] = [{g["name"]: aug[g["symbol"]] for g in deg_0_gens} for aug in dga.augmentations]
+    return output
 
 
 @APP.route('/')

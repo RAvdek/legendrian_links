@@ -7,27 +7,8 @@ table, th, td {
 <body>
 Lagrangian resolution of the plat:
 <br><br>
-<svg height="{{ height }}" width="{{ width }}">
-  {% for line in lines %}
-  <line
-    x1="{{ line['start_xy'][0] }}" y1="{{ line['start_xy'][1] }}" x2="{{ line['end_xy'][0] }}" y2="{{ line['end_xy'][1] }}"
-    style="stroke:rgb({{ line['rgb'][0] }},{{ line['rgb'][1] }},{{ line['rgb'][2] }});stroke-width:4"
-  />
-  <text x="{{ line['label']['x'] }}" y="{{ line['label']['y'] }}">
-      {{ line['label']['marker'] }}
-  </text>
-  {% endfor %}
-  {% for thing in x_labels %}
-    <text x="{{ thing['x'] }}" y="{{ height }}">
-      {{ thing["label"] }}
-    </text>
-  {% endfor %}
-  {% for thing in y_labels %}
-    <text x="{{ pad }}" y="{{ thing['y'] }}">
-      {{ thing["label"] }}
-    </text>
-  {% endfor %}
-</svg>
+{% import "svg_macro.html" as svg %}
+{{ svg.diagram(svg_context) }}
 <br><br>
 Knots with classical invariants:
 <br><br>
@@ -57,60 +38,22 @@ Chords are labeled by their x-coordinates:
 <table>
   <tr>
     <th>Chord</th>
-    <th>Grading ({{ lch_graded_by }})</th>
     <th>From knot</th>
     <th>To knot</th>
-    <th>LCH del (with Z/2Z coeffs)</th>
   </tr>
   {% for chord in chords %}
   <tr>
     <td>{{ chord["string"] }}</td>
-    <td>{{ chord["grading"] }}</td>
     <td>{{ chord["from_knot"] }}</td>
     <td>{{ chord["to_knot"] }}</td>
-    <td>{{ chord["lch_del"] }}</td>
   </tr>
   {% endfor %}
 </table>
 <br><br>
-{% if lch_has_augs %}
-Augmentations
-<br><br>
-<table>
-  <tr>
-    {% for g in lch_aug_gens %}
-    <th>{{ g }}</th>
-    {% endfor %}
-  </tr>
-  {% for aug in lch_augs %}
-  <tr>
-    {% for g in lch_aug_gens %}
-    <td>{{ aug[g] }}</td>
-    {% endfor %}
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-No non-trivial augmentations found
-{% endif %}
-<br><br>
-{% if not link_is_connected %}
-RSFT generators
-<br><br>
-<table>
-  <tr>
-    <th>Word of chords</th>
-    <th>Grading ({{ rsft_graded_by }})</th>
-  </tr>
-  {% for word in rsft_generators %}
-  <tr>
-    <td>{{ word["string"] }}</td>
-    <td>{{ word["grading"] }}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% endif %}
-<br><br>
+{% import "dga_macro.html" as dga_macro %}
+{% for ctx in dgas %}
+{{ dga_macro.dga(ctx) }}
+{% endfor %}
 A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
 {% for d in disk_corners %}
