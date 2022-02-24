@@ -80,19 +80,24 @@ class RSFTGenerator(object):
             if not isinstance(chord, Chord):
                 raise ValueError("Trying to create WordOfChord object not from a list of chords")
         self.word = word
+        self.length = len(word)
         graded_by_valid_or_except(graded_by)
-        self.capping_paths = capping_paths
-        if graded_by.is_ZZ:
-            if capping_paths is None:
-                raise ValueError(f"Z graded RSFT generators need capping paths.")
-            if len(capping_paths) != len(word):
-                raise ValueError(f"len(capping_paths) = {len(capping_paths)} != len(word) = {len(word)}")
         self.graded_by = graded_by
+        self.capping_paths = capping_paths
+        self._validate_capping_paths()
         self._set_grading()
+        self._set_knot_labels()
         self._set_symbol()
 
     def __repr__(self):
          return "{" + ",".join([str(chord.x) for chord in self.word]) + "}"
+
+    def _validate_capping_paths(self):
+        if self.graded_by.is_ZZ:
+            if self.capping_paths is None:
+                raise ValueError(f"Z graded RSFT generators need capping paths.")
+            if len(self.capping_paths) != len(self.word):
+                raise ValueError(f"len(capping_paths) = {len(self.capping_paths)} != len(word) = {len(self.word)}")
 
     def _set_grading(self):
         if self.graded_by.is_ZZ:
@@ -100,8 +105,17 @@ class RSFTGenerator(object):
         else:
             self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
 
+    def _set_knot_labels(self):
+        knot_labels = []
+        for chord in self.word:
+            kl = chord.top_line_segment.knot_label
+            if kl is None:
+                raise RuntimeError(f"Trying to set knot labels for {str(self)} with unlabeled chord {chord}")
+            knot_labels.append(kl)
+        self.knot_labels = knot_labels
+
     def _set_symbol(self):
-        self.symbol = sympy.Symbol(str(self))
+        self.symbol = sympy.Symbol(str(self), commutative=False)
 
 
 class DiskCorner(object):
@@ -481,6 +495,7 @@ class PlatDiagram(object):
         self._set_lch_generators()
         self._set_lch_dga()
         if not self.link_is_connected:
+            self._set_composable_admissible_words()
             self._set_rsft_graded_by()
             self._set_rsft_generators()
 
@@ -572,6 +587,40 @@ class PlatDiagram(object):
         if n_results != 1:
             raise RuntimeError(f"Found {n_results} possible LCH generators for chord {chord}")
         return search_results[0]
+
+    def get_rsft_generator_from_word(self, word, raise_if_not_found=True):
+        search_results = [w for w in self.rsft_generators if w.word == word]
+        n_results = len(search_results)
+        if n_results > 1:
+            raise RuntimeError(f"Found {n_results} possible RSFT generators for word {word}")
+        if n_results == 0:
+            if raise_if_not_found:
+                raise ValueError(f"No RSFT generator found matching word {word}")
+            return
+        return search_results[0]
+
+    def word_is_admissible(self, word, cyclic=True):
+        """Returns True / False for if the word of chords is `admissible`. This means that each pair of chords is
+        composable and that the endpoints of chords hit eat knot at most once.
+
+        :param word: list of chords
+        :param cyclic: Are we requiring that word[-1] is composable with word[0]?
+        :return: Boolean
+        """
+        if len(word) == 1:
+            if cyclic:
+                return (word[0], word[0]) in self.composable_pairs
+            else:
+                return True
+        else:
+            output = True
+            output &= all([(word[i], word[i+1]) in self.composable_pairs for i in range(len(word) - 1)])
+            endpoint_labels = [c.top_line_segment.knot_label for c in word]
+            output &= utils.is_nonrepeating(endpoint_labels)
+            if not cyclic:
+                return output
+            output &= (word[-1], word[0]) in self.composable_pairs
+            return output
 
     def _set_line_segments(self):
         lines = []
@@ -804,8 +853,7 @@ class PlatDiagram(object):
             disk_corners = d.disk_corners.copy()
             # cyclically rotate disk until positive corner is in the last (-1) position
             while disk_corners[-1].pos_neg == '-':
-                last_corner = disk_corners.pop(-1)
-                disk_corners = [last_corner] + disk_corners
+                disk_corners = utils.rotate(disk_corners, 1)
             pos_chord = disk_corners.pop().chord
             pos_generator = self.get_lch_generator_from_chord(pos_chord)
             if len(disk_corners) > 0:
@@ -822,7 +870,8 @@ class PlatDiagram(object):
         gradings = {g.symbol: g.grading for g in self.lch_generators}
         self.lch_dga = algebra.DGA(gradings=gradings, differentials=lch_del, coeff_mod=2)
 
-    def _set_rsft_generators(self):
+    def _set_composable_admissible_words(self):
+        """Store all composable admissible (not necessarily cyclic) words in memory for lookup access"""
         # length 1 composable words
         composable_admissible_words = [[[chord] for chord in self.chords]]
         # dynamic algo to find words of length n from words of length n-1
@@ -832,13 +881,14 @@ class PlatDiagram(object):
                 word + [chord] for word in largest_length_words for chord in self.chords
                 if word[-1].is_composable_with(chord)]
             # filter on admissibility
-            new_words = [word for word in new_words
-                         if max(Counter([c.top_line_segment.knot_label for c in word]).values()) == 1]
+            new_words = [word for word in new_words if self.word_is_admissible(word, cyclic=False)]
             composable_admissible_words.append(new_words)
+        self.composable_admissible_words = composable_admissible_words
 
+    def _set_rsft_generators(self):
         cyclic_composable_admissible_words = []
-        for wl in range(len(composable_admissible_words)):
-            for w in composable_admissible_words[wl]:
+        for wl in range(len(self.composable_admissible_words)):
+            for w in self.composable_admissible_words[wl]:
                 if w[-1].is_composable_with(w[0]):
                     capping_paths = None
                     if self.rsft_graded_by.is_ZZ:
@@ -857,14 +907,105 @@ class PlatDiagram(object):
         self.rsft_generators = cyclic_composable_admissible_words
 
     def _set_rsft_dga(self):
-        """We need to understand how each disk contributes to the RSFT del. This could be done by...
-        Taking each disk, and finding each possible extension to an RSFT generator by gluing on a generator at its
-        first puncture to a negative puncture of the disk.
+        disks = self.disks
+        rsft_del = {w: 0 for w in self.rsft_generators}
 
-        If the negative puncture is pure, then there is a unique way to glue. Also, we have some control from the max
-        length of a word being equal to the number of components of the link.
+        # Helper methods for dealing with extensions of disks to admissible cyclic words
 
-        Note also... the number of generators is very large, and so searching for augmentations will be very expensive.
-        However, we can reduce the number of inputs when working over Z/2Z by forgetting the cyclic ordering.
-        """
-        raise NotImplementedError()
+        def all_chords_positive(ext):
+            return all([a['pos_neg'] == '+' for a in ext['asymptotics']])
+
+        def non_repeating_knots_at_pos_endpoints(ext):
+            pos_knot_labels = [a['knot_label'] for a in ext['asymptotics'] if a['pos_neg'] == '+']
+            return utils.is_nonrepeating(pos_knot_labels)
+
+        for d in disks:
+            d_asymptotics = [
+                {
+                    'chord': dc.chord,
+                    'pos_neg': dc.pos_neg,
+                    'knot_label': (
+                        dc.chord.top_line_segment.knot_label if dc.chord.pos_neg == '+'
+                        else dc.chord.top_line_segment.knot_label
+                    )
+                }
+                for dc in d.disk_corners
+            ]
+            if any([a['knot_label'] is None for a in d_asymptotics]):
+                raise RuntimeError("Knot labels yet not initialized")
+            n_neg_punctures = len([a for a in d_asymptotics if a['pos_neg'] == '-'])
+
+            # Create a list of possible extensions to cyclic words of chords
+            # while keeping track of the words we use to extend.
+            extensions = [{
+                "asymptotics": d_asymptotics,
+                "output_words": []
+            }]
+            while not all([all_chords_positive(ext) for ext in extensions]):
+                updated_extensions = []
+                for ext in extensions:
+                    if all_chords_positive(ext) and non_repeating_knots_at_pos_endpoints(ext):
+                        updated_extensions.append(ext)
+                    else:
+                        asymptotics = ext['asymptotics']
+                        neg_indices = [i for i in range(len(asymptotics)) if asymptotics[i]['pos_neg'] == '-']
+                        least_neg_index = min(neg_indices)
+                        first_neg_chord = asymptotics[least_neg_index]['chord']
+                        possible_extensions = [
+                            g.word for g in self.rsft_generators
+                            if g.word[0] == first_neg_chord]
+                        for poss_ext_word in possible_extensions:
+                            new_asymptotics = asymptotics[:least_neg_index]
+                            new_asymptotics += [
+                                {
+                                    "chord": chord,
+                                    "pos_neg": "+",
+                                    "knot_label": chord.top_line_segment.knot_label
+                                }
+                                for chord in poss_ext_word[1:]
+                            ]
+                            new_asymptotics += asymptotics[least_neg_index:]
+                            new_output_words = ext["output_words"] + [poss_ext_word]
+                            new_ext = {
+                                "asymptotics": new_asymptotics,
+                                "output_words": new_output_words
+                            }
+                            if non_repeating_knots_at_pos_endpoints(new_ext):
+                                updated_extensions.append(new_ext)
+                extensions = updated_extensions
+            # At this point we have all extensions of the disk to cyclic words of chords.
+            # Now we want to cyclically rotate the input words in all possible ways
+            # and add these to our differentials.
+            for ext in extensions:
+                for i in range(len(ext['asymptotics'])):
+                    input_word = utils.rotate([a['chord'] for a in ext['asymptotics']], i)
+                    first_input_chord = input_word[0]
+                    input_generator = self.get_rsft_generator_from_word(input_word)
+                    if n_neg_punctures == 0:
+                        # if there are no negative chords, then we contribute 1 to the differential
+                        rsft_del[input_generator] += 1
+                    else:
+                        output_words = ext["output_words"]
+                        if first_input_chord in [a['chord'] for a in d_asymptotics if a['pos_neg'] == '+']:
+                            # if the first chord of the input word is in the holo disk, rotate the output words until
+                            # the first chord of the first output word agrees with the next negative puncture
+                            while d_asymptotics[0]["chord"] != first_input_chord:
+                                d_asymptotics = utils.rotate(d_asymptotics, 1)
+                            first_neg_chord_of_d = [a for a in d_asymptotics if a['pos_neg'] == '-'][0]
+                            while output_words[0][0] != first_neg_chord_of_d:
+                                output_words = utils.rotate(output_words, 1)
+                        else:
+                            # if the first chord in the input word is in one of the output words...
+                            while first_input_chord not in output_words[0]:
+                                output_words = utils.rotate(output_words, 1)
+                            while first_input_chord != output_words[0][0]:
+                                output_words[0] = utils.rotate(output_words[0], 1)
+                        output_symbols = [self.get_rsft_generator_from_word(w).symbol for w in output_words]
+                        output_monomial = prod([output_symbols])
+                        rsft_del[input_generator] += output_monomial
+        rsft_del = {
+            g.symbol: algebra.Differential(rsft_del[g])
+            for g in rsft_del.keys()
+        }
+        gradings = {g.symbol: g.grading for g in self.rsft_generators}
+        self.rsft_dga = algebra.DGA(gradings=gradings, differentials=rsft_del, coeff_mod=2)
