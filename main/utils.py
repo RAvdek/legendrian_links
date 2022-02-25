@@ -13,21 +13,30 @@ def get_logger(name):
     return logger
 
 
-def is_nonrepeating(tuple):
-    """Are the elements in a tuple unique?
+def is_nonrepeating(array):
+    """Are the elements in a tuple unique? Will have to do this over and over...
+    Faster and less memory expensive than `len(set(tuple)) == len(tuple)`
 
-    :param tuple: list
+    :param array: list
     :return: Bool
     """
-    return len(set(tuple)) == len(tuple)
+    known = []
+    while len(array) > 0:
+        if array[0] in known:
+            return False
+        else:
+            known.append(array[0])
+            array = array[1:]
+    return True
 
 
-def rotate(tuple, n):
-    """Rotates a tuple n times. For example:
-    rotate([1, 2, 3, 4], 1) = [4, 1, 2, 3]
+def rotate(array, n):
+    """Rotates a tuple so that the nth entry is in the 0th slot
+    rotate([0, 1, 2, 3, 4], 2) = [2, 3, 4, 0, 1]
 
-    :param tuple: list
+    :param array: list
     :param n: how many times to rotate
     :return: list
     """
-    return tuple[-n:] + tuple[:-n]
+    n %= len(array)
+    return array[n:] + array[:n]

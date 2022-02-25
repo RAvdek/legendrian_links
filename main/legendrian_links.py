@@ -924,120 +924,146 @@ class PlatDiagram(object):
 
         # Helper methods for dealing with extensions of disks to admissible cyclic words
 
-        def all_chords_positive(ext):
-            return all([a['pos_neg'] == '+' for a in ext['asymptotics']])
+        class DiskExtension(object):
+            """Extension of a holomorphic disk obtained by attaching RSFT generators to negative punctures"""
 
-        def extension_is_admissible(ext, cyclic):
-            return self.word_is_admissible(
-                [a['chord'] for a in ext['asymptotics'] if a['pos_neg'] == '+'],
-                cyclic=cyclic
-            )
+            def __init__(self, disk, output_gens=[]):
+                """
+                :param disk: Disk instance
+                :param gens: list of RSFT generators
+                """
+                self.disk = disk
+                self.output_gens = output_gens
+                self._set_disk_asymptotics()
+                self._set_asymptotics()
+                self._set_first_neg_chord()
 
+            def positive(self):
+                return self.n_neg_punctures == 0
+
+            def partially_admissible(self):
+                to_knot_labels = []
+                for i in range(len(self.asymptotics)):
+                    j = (i + 1) % len(self.asymptotics)
+                    current_a = self.asymptotics[i]
+                    next_a = self.asymptotics[j]
+                    if current_a['pos_neg'] == '+':
+                        current_to_label = current_a['to_knot_label']
+                        to_knot_labels.append(current_to_label)
+                        if next_a['pos_neg'] == '+':
+                            # False if consecutive positive punctures are not composable
+                            if current_to_label != next_a['from_knot_label']:
+                                return False
+                return utils.is_nonrepeating(to_knot_labels)
+
+            def get_word(self):
+                return [a['chord'] for a in self.asymptotics]
+
+            def _set_disk_asymptotics(self):
+                self.disk_asymptotics = [
+                    {
+                        'chord': dc.chord,
+                        'pos_neg': dc.pos_neg,
+                        'to_knot_label': dc.chord.top_line_segment.knot_label,
+                        'from_knot_label': dc.chord.bottom_line_segment.knot_label
+                    }
+                    for dc in self.disk.disk_corners
+                ]
+                self.disk_n_neg_punctures = len([a for a in self.disk_asymptotics if a['pos_neg'] == '-'])
+
+            def _set_asymptotics(self):
+                asymptotics = []
+                temp_output_words = [g.word for g in self.output_gens]
+                for a in self.disk_asymptotics:
+                    if a['pos_neg'] == '+':
+                        asymptotics.append(a)
+                    else:
+                        if a['chord'] in [w[0] for w in temp_output_words]:
+                            new_word = [w for w in temp_output_words if w[0] == a['chord']][0]
+                            for chord in new_word[1:]:
+                                asymptotics.append({
+                                    'chord': chord,
+                                    'pos_neg': '+',
+                                    'to_knot_label': chord.top_line_segment.knot_label,
+                                    'from_knot_label': chord.bottom_line_segment.knot_label
+                                })
+                            temp_output_words = temp_output_words[1:]
+                        else:
+                            asymptotics.append(a)
+                self.asymptotics = asymptotics
+                self.n_neg_punctures = len([a for a in self.asymptotics if a['pos_neg']=='-'])
+
+            def _set_first_neg_chord(self):
+                if self.positive():
+                    self.first_neg_index = None
+                    self.first_neg_chord = None
+                    return
+                for i in range(len(self.asymptotics)):
+                    a = self.asymptotics[i]
+                    if a['pos_neg'] == '-':
+                        self.first_neg_index = i
+                        self.first_neg_chord = a['chord']
         for d in disks:
-            d_asymptotics = [
-                {
-                    'chord': dc.chord,
-                    'pos_neg': dc.pos_neg,
-                    'to_knot_label': dc.chord.top_line_segment.knot_label,
-                    'from_knot_label': dc.chord.bottom_line_segment.knot_label
-                }
-                for dc in d.disk_corners
-            ]
-            if any([a['from_knot_label'] is None for a in d_asymptotics]):
-                raise RuntimeError("Knot labels yet not initialized")
-            n_neg_punctures = len([a for a in d_asymptotics if a['pos_neg'] == '-'])
-
             # Create a list of possible extensions to cyclic words of chords
             # while keeping track of the words we use to extend.
-            extensions = [{
-                "asymptotics": d_asymptotics,
-                "output_words": []
-            }]
-            while_c_1 = 0
-            while not all([all_chords_positive(ext) for ext in extensions]):
-                while_c_1 +=1
-                if while_c_1 % 1000 == 0:
-                    LOG.info(f"while {while_c_1} @ 949: {d}")
+            extensions = [DiskExtension(d, output_gens=[])]
+            while not all([de.positive() for de in extensions]):
                 updated_extensions = []
                 for ext in extensions:
-                    if all_chords_positive(ext) and extension_is_admissible(ext, cyclic=False):
-                        updated_extensions.append(ext)
-                    else:
-                        asymptotics = ext['asymptotics']
-                        neg_indices = [i for i in range(len(asymptotics)) if asymptotics[i]['pos_neg'] == '-']
-                        least_neg_index = min(neg_indices)
-                        first_neg_chord = asymptotics[least_neg_index]['chord']
-                        possible_extensions = [
-                            g.word for g in self.rsft_generators
-                            if g.word[0] == first_neg_chord]
-                        if while_c_1 % 1000 == 0:
-                            LOG.info(f"while {while_c_1} @ 968: {possible_extensions}")
-                        for poss_ext_word in possible_extensions:
-                            new_asymptotics = asymptotics[:least_neg_index]
-                            new_asymptotics += [
-                                {
-                                    "chord": chord,
-                                    "pos_neg": "+",
-                                    "knot_label": chord.top_line_segment.knot_label
-                                }
-                                for chord in poss_ext_word[1:]
-                            ]
-                            new_asymptotics += asymptotics[least_neg_index+1:]
-                            new_output_words = ext["output_words"] + [poss_ext_word]
-                            new_ext = {
-                                "asymptotics": new_asymptotics,
-                                "output_words": new_output_words
-                            }
-                            if extension_is_admissible(new_ext, cyclic=False):
+                    if ext.partially_admissible():
+                        if ext.positive():
+                            updated_extensions.append(ext)
+                        else:
+                            possible_extensions = [
+                                g for g in self.rsft_generators
+                                if g.word[0] == ext.first_neg_chord]
+                            for new_gen in possible_extensions:
+                                new_ext = DiskExtension(d, output_gens=ext.output_gens + [new_gen])
                                 updated_extensions.append(new_ext)
-                extensions = [ext for ext in updated_extensions if extension_is_admissible(ext, cyclic=True)]
+                extensions = [ext for ext in updated_extensions if ext.partially_admissible()]
+            # Now filter for those extensions which are RSFT generators
+            extensions = [
+                ext for ext in extensions
+                if self.get_rsft_generator_from_word(ext.get_word(), raise_if_not_found=False) is not None
+            ]
             # At this point we have all extensions of the disk to cyclic words of chords.
             # Now we want to cyclically rotate the input words in all possible ways
             # and add these to our differentials.
             for ext in extensions:
-                for i in range(len(ext['asymptotics'])):
-                    input_word = utils.rotate([a['chord'] for a in ext['asymptotics']], i)
+                for i in range(len(ext.asymptotics)):
+                    input_word = utils.rotate([a['chord'] for a in ext.asymptotics], i)
                     first_input_chord = input_word[0]
-                    input_generator = self.get_rsft_generator_from_word(input_word, raise_if_not_found=False)
-                    if input_generator is None:
-                        continue
-                    if n_neg_punctures == 0:
+                    input_generator = self.get_rsft_generator_from_word(input_word)
+                    if len(ext.output_gens) == 0:
                         # if there are no negative chords, then we contribute 1 to the differential
                         rsft_del[input_generator] += 1
                     else:
-                        output_words = ext["output_words"]
-                        if first_input_chord in [a['chord'] for a in d_asymptotics if a['pos_neg'] == '+']:
-                            # if the first chord of the input word is in the holo disk, rotate the output words until
-                            # the first chord of the first output word agrees with the next negative puncture
-                            while_c_2 = 0
-                            while d_asymptotics[0]["chord"] != first_input_chord:
-                                while_c_2 += 1
-                                if while_c_2 % 1000 == 0:
-                                    LOG.info(f"while {while_c_2} @ 1008")
-                                d_asymptotics = utils.rotate(d_asymptotics, 1)
-                            first_neg_chord_of_d = [a["chord"] for a in d_asymptotics if a['pos_neg'] == '-'][0]
-                            while_c_3 = 0
-                            while output_words[0][0] != first_neg_chord_of_d:
-                                while_c_3 += 1
-                                if while_c_3 % 1000 == 0:
-                                    LOG.info(f"while {while_c_3} @ 1015: {output_words[0][0]} != {first_neg_chord_of_d}")
-                                output_words = utils.rotate(output_words, 1)
+                        if first_input_chord in [a['chord'] for a in ext.disk_asymptotics if a['pos_neg'] == '+']:
+                            # if the first chord of the input word is in the holo disk,
+                            # get the appropriate order
+                            index_in_jdisk = [a['chord'] for a in ext.disk_asymptotics].index(first_input_chord)
+                            next_negative_puncture_index = index_in_jdisk
+                            while ext.disk_asymptotics[next_negative_puncture_index]['pos_neg'] == '+':
+                                next_negative_puncture_index += 1
+                                next_negative_puncture_index %= len(ext.disk.disk_corners)
+                            next_negative_chord = ext.disk_asymptotics[next_negative_puncture_index]['chord']
+                            # Here we use the fact that in a plat diagram, each chord can appear at most once
+                            # at a negative puncture of an index one disk.
+                            output_w_next_neg = [g for g in ext.output_gens if next_negative_chord in g.word][0]
+                            index_of_first_output_gen = ext.output_gens.index(output_w_next_neg)
+                            output_gens = utils.rotate(ext.output_gens, index_of_first_output_gen)
                         else:
                             # if the first chord in the input word is in one of the output words...
-                            while_c_4 = 0
-                            while first_input_chord not in output_words[0]:
-                                while_c_4 += 1
-                                if while_c_4 % 1000 == 0:
-                                    LOG.info(f"while {while_c_4} @ 1023")
-                                output_words = utils.rotate(output_words, 1)
-                            while_c_5 = 0
-                            while first_input_chord != output_words[0][0]:
-                                while_c_5 += 1
-                                if while_c_5 % 1000 == 0:
-                                    LOG.info(f"while {while_c_5} @ 1029")
-                                output_words[0] = utils.rotate(output_words[0], 1)
-                        LOG.info(output_words)
-                        output_symbols = [self.get_rsft_generator_from_word(w).symbol for w in output_words]
+                            first_output_gen = [g for g in ext.output_gens if first_input_chord in g.word][0]
+                            index_of_first_output_gen = ext.output_gens.index(first_output_gen)
+                            output_words = utils.rotate([g.word for g in ext.output_gens], index_of_first_output_gen)
+                            # rotate the first output word so that the first_input_chord leads
+                            first_output_word = output_words[0]
+                            index_of_chord_in_first_word = first_output_word.index(first_input_chord)
+                            first_output_word = utils.rotate(first_output_word, index_of_chord_in_first_word)
+                            output_words[0] = first_output_word
+                            output_gens = [self.get_rsft_generator_from_word(w) for w in output_words]
+                        output_symbols = [g.symbol for g in output_gens]
                         output_monomial = prod(output_symbols)
                         rsft_del[input_generator] += output_monomial
         rsft_del = {
