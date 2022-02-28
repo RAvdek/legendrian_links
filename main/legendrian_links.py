@@ -57,6 +57,7 @@ class LCHGenerator(object):
         graded_by_valid_or_except(graded_by)
         self.graded_by = graded_by
         self._set_grading()
+        self._set_x()
         self._set_symbol()
 
     def __repr__(self):
@@ -68,6 +69,9 @@ class LCHGenerator(object):
             self.grading = maslov
         else:
             self.grading = 0 if self.chord.sign == 1 else 1
+
+    def _set_x(self):
+        self.x = self.chord.x
 
     def _set_symbol(self):
         self.symbol = sympy.Symbol(str(self), commutative=False)
@@ -87,6 +91,7 @@ class RSFTGenerator(object):
         self._validate_capping_paths()
         self._set_grading()
         self._set_knot_labels()
+        self._set_x()
         self._set_symbol()
 
     def __repr__(self):
@@ -113,6 +118,9 @@ class RSFTGenerator(object):
                 raise RuntimeError(f"Trying to set knot labels for {str(self)} with unlabeled chord {chord}")
             knot_labels.append(kl)
         self.knot_labels = knot_labels
+
+    def _set_x(self):
+        self.x = [chord.x for chord in self.word]
 
     def _set_symbol(self):
         self.symbol = sympy.Symbol(str(self), commutative=False)
@@ -1003,6 +1011,8 @@ class PlatDiagram(object):
                     if a['pos_neg'] == '-':
                         self.first_neg_index = i
                         self.first_neg_chord = a['chord']
+                        return
+
         for d in disks:
             # Create a list of possible extensions to cyclic words of chords
             # while keeping track of the words we use to extend.
@@ -1014,10 +1024,11 @@ class PlatDiagram(object):
                         if ext.positive():
                             updated_extensions.append(ext)
                         else:
-                            possible_extensions = [
+                            new_generators = [
                                 g for g in self.rsft_generators
-                                if g.word[0] == ext.first_neg_chord]
-                            for new_gen in possible_extensions:
+                                if g.word[0] == ext.first_neg_chord
+                            ]
+                            for new_gen in new_generators:
                                 new_ext = DiskExtension(d, output_gens=ext.output_gens + [new_gen])
                                 updated_extensions.append(new_ext)
                 extensions = [ext for ext in updated_extensions if ext.partially_admissible()]

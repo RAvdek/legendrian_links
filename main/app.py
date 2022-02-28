@@ -112,6 +112,7 @@ def get_dga_context(dga, name):
     ]
     generators = sorted(generators, key=lambda g: g["name"])
     output["generators"] = generators
+    output["n_augs"] = len(dga.augmentations)
     output["has_augs"] = len(dga.augmentations) > 0
     deg_0_gens = [g for g in generators if g["grading"] == 0]
     output["deg_0_gens"] = deg_0_gens

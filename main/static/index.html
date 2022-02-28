@@ -14,17 +14,14 @@ Chords are labeled by their x-coordinates:
 <br><br>
 <table>
   <tr>
-    <th>Chord</th>
-    <th>From knot</th>
-    <th>To knot</th>
+    <td></td>{% for chord in chords %}<th>{{ chord["string"] }}</th>{% endfor %}
   </tr>
-  {% for chord in chords %}
   <tr>
-    <td>{{ chord["string"] }}</td>
-    <td>{{ chord["from_knot"] }}</td>
-    <td>{{ chord["to_knot"] }}</td>
+    <th>From knot</th>{% for chord in chords %}<td>{{ chord["from_knot"] }}</td>{% endfor %}
   </tr>
-  {% endfor %}
+  <tr>
+    <th>To knot</th>{% for chord in chords %}<td>{{ chord["to_knot"] }}</td>{% endfor %}
+  </tr>
 </table>
 <br><br>
 {% import "dga_macro.html" as dga_macro %}
