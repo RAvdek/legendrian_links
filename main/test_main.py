@@ -140,10 +140,10 @@ class TestMatrix(unittest.TestCase):
 
     def test_modulus(self):
         self.assertFalse(
-            np.any(Matrix([[4]], coeff_modulus=3).values - Matrix([[1]], coeff_modulus=3).values)
+            np.any(Matrix([[4]], coeff_mod=3).values - Matrix([[1]], coeff_mod=3).values)
         )
         self.assertFalse(
-            np.any(Matrix([[1, 2], [2, 2]], coeff_modulus=2).values - Matrix([[1, 0], [0, 0]], coeff_modulus=2).values)
+            np.any(Matrix([[1, 2], [2, 2]], coeff_mod=2).values - Matrix([[1, 0], [0, 0]], coeff_mod=2).values)
         )
 
 

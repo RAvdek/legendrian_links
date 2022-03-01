@@ -14,6 +14,11 @@
     "n_strands": 4,
     "front_crossings": [1, 1, 1]
   },
+  "m5_2_1": {
+    "comment": "One of the original 5_2",
+    "n_strands": 4,
+    "front_crossings": [1,1,0,2,1,1,1]
+  },
   "polyfillable": {
     "comment": "Polyfillable link from https://arxiv.org/abs/1307.7998",
     "n_strands": 6,

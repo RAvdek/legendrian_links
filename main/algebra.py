@@ -9,11 +9,6 @@ LOG = utils.get_logger(__name__)
 
 class Differential(object):
     """Differential of a DGA element.
-
-    self.summands is a list of lists. Each list stores the factors in the order in which they appear. Eg.
-    1 + x + z + x*y*z will be stored as [[1], [x], [z], [x,y,z]] whereas...
-    1 + x + z + z*y*x will be stored as [[1], [x], [z], [z,y,x]]
-    This non-commutative storage is needed for bilinearization.
     """
 
     def __init__(self, expression, coeff_mod=2):
@@ -33,7 +28,27 @@ class Differential(object):
     def bilinearize(self, subs_1, subs_2):
         """Return bilinearized differential should use expression.args to capture monomials and then .args again to get
         individual terms"""
-        raise NotImplementedError()
+        monoms = self.expression.args
+        # eliminate constant terms
+        monoms = [m for m in monoms if not m.is_Number]
+        output_summands = []
+        for m in monoms:
+            if m.is_symbol:
+                output_summands.append(m)
+            else:
+                args = m.args
+                coeff = 1
+                if args[0].is_number:
+                    coeff = args[0]
+                    args = args[1:]
+                for i in range(len(args)):
+                    factor_1 = prod([s.subs(subs_1) for s in args[:i]])
+                    linear_term = args[i]
+                    factor_2 = prod([s.subs(subs_2) for s in args[i+1:]])
+                    summand = coeff * factor_1 * linear_term * factor_2
+                    output_summands.append(summand)
+        return sum(output_summands)
+
 
 
 class Matrix(object):
@@ -43,7 +58,7 @@ class Matrix(object):
     values: np.array
     n_rows:
     n_cols:
-    coeff_modulus: Consider as matrix with coeffs modulus this number
+    coeff_mod: Consider as matrix with coeffs modulus this number
     ref: Row echelon form
     ref_q: Matrix q such that q*ref = self
     ref_q_inv: Inverse of ref_q
@@ -51,14 +66,14 @@ class Matrix(object):
     rank_ker: Dimension of the kernel
     """
 
-    def __init__(self, values, coeff_modulus=0, lazy_ref=False):
+    def __init__(self, values, coeff_mod=0, lazy_ref=False):
         self.lazy_ref = lazy_ref
         self.values = np.array(values)
         self.n_rows = self.values.shape[0]
         self.n_cols = self.values.shape[1]
-        self.coeff_modulus = coeff_modulus
-        if coeff_modulus != 0:
-            self.values %= self.coeff_modulus
+        self.coeff_mod = coeff_mod
+        if coeff_mod != 0:
+            self.values %= self.coeff_mod
         self.ref = None
         self.ref_q = None
         self.ref_q_inv = None
@@ -78,11 +93,11 @@ class Matrix(object):
         """
         if not isinstance(other, Matrix):
             raise ValueError(f"Trying to multiply matrix with {other.__class__}")
-        if not self.coeff_modulus == other.coeff_modulus:
-            raise ValueError(f"Trying to multiply matrix having coeff_modulus={self.coeff_modulus} "
-                             f"with other having coeff_modulus={other.coeff_modulus}")
+        if not self.coeff_mod == other.coeff_mod:
+            raise ValueError(f"Trying to multiply matrix having coeff_modulus={self.coeff_mod} "
+                             f"with other having coeff_modulus={other.coeff_mod}")
         values = np.matmul(self.values, other.values)
-        return Matrix(values=values, coeff_modulus=self.coeff_modulus, lazy_ref=self.lazy_ref)
+        return Matrix(values=values, coeff_mod=self.coeff_mod, lazy_ref=self.lazy_ref)
 
     def set_row_echelon(self):
         """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
@@ -101,9 +116,9 @@ class Matrix(object):
                 break
             ref, q, q_inv = self._row_reduce(ref, q, q_inv, k, l)
             k += 1
-        self.ref = Matrix(ref, coeff_modulus=self.coeff_modulus, lazy_ref=True)
-        self.ref_q = Matrix(q, coeff_modulus=self.coeff_modulus, lazy_ref=True)
-        self.ref_q_inv = Matrix(q_inv, coeff_modulus=self.coeff_modulus, lazy_ref=True)
+        self.ref = Matrix(ref, coeff_mod=self.coeff_mod, lazy_ref=True)
+        self.ref_q = Matrix(q, coeff_mod=self.coeff_mod, lazy_ref=True)
+        self.ref_q_inv = Matrix(q_inv, coeff_mod=self.coeff_mod, lazy_ref=True)
         self.rank_im = k
         self.rank_ker = self.n_cols - k
 
@@ -136,37 +151,44 @@ class Matrix(object):
     def _partial_row_reduce(self, ref, q, q_inv, k, l):
         for i in range(k + 1, q.shape[0]):
             q = (ref[i, l] // ref[k, l])
-            if self.coeff_modulus != 0:
-                q %= self.coeff_modulus
+            if self.coeff_mod != 0:
+                q %= self.coeff_mod
             # row add i,k,-q
             ref[i] += (-q * ref[k])
             q_inv[i] += (-q * q_inv[k])  # row add
             q[:, k] += (q * q[:, i])  # column add (note i,k are switched)
-            if self.coeff_modulus != 0:
-                ref[i] %= self.coeff_modulus
-                q_inv[i] %= self.coeff_modulus
-                q[:, k] %= self.coeff_modulus
+            if self.coeff_mod != 0:
+                ref[i] %= self.coeff_mod
+                q_inv[i] %= self.coeff_mod
+                q[:, k] %= self.coeff_mod
         return ref, q, q_inv
 
 
 class LinearMap(object):
     """Interface to matrices for linear polynomial expressions"""
 
-    def __init__(self, coeff_dict, coeff_mod=2):
+    def __init__(self, coeff_dict, range_symbols, coeff_mod=2):
         """
         :param coeff_dict: Dict of the form {symbol: sympy expression}
         :param coeff_mod: Coefficient modulus to use
         """
         self.coeff_dict = coeff_dict
+        self.range_symbols = range_symbols
         self.coeff_mod = coeff_mod
-        self._set_var_mapping()
+        self._set_input_vars()
         self._set_matrix()
 
-    def _set_var_mapping(self):
+    def _set_input_vars(self):
         """Encode input and output symbols as `onehot` vectors so that they could be turned into a matrix"""
+        self.input_vars = list(self.coeff_dict.keys())
 
     def _set_matrix(self):
-        raise NotImplementedError()
+        values = [[0]*len(self.input_vars) for _ in self.range_symbols]
+        for i in range(len(self.input_vars)):
+            for j in range(len(self.range_symbols)):
+                temp_subs = {s: 0 if s != self.range_symbols[j] else 1 for s in self.range_symbols}
+                values[j][i] = self.coeff_dict[self.input_vars[i]].subs(temp_subs)
+        self.matrix = Matrix(values=values, coeff_mod=self.coeff_mod)
 
 
 class DGBase(object):
@@ -225,14 +247,50 @@ class ChainComplex(DGBase):
             grading_mod=grading_mod
         )
         self._verify_linear_differentials()
+        self._set_linear_maps()
+        self._set_poincare_poly()
 
     def _verify_linear_differentials(self):
         for k, v in self.differentials.items():
             if not v.is_linear():
                 raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
 
-    def _set_betti_numbers(self):
-        raise NotImplementedError()
+    def _set_linear_maps(self):
+        self.linear_maps = dict()
+        for i in self.gradings.values():
+            j = i + 1
+            if self.grading_mod != 0:
+                j %= self.grading_mod
+            range_symbols = [s for s in self.symbols if self.gradings[s] == j]
+            domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
+            diffs = {s: self.differentials[s] for s in domain_symbols}
+            self.linear_maps[i] = LinearMap(
+                coeff_dict=diffs,
+                range_symbols=range_symbols,
+                coeff_mod=self.coeff_mod
+            )
+
+    def _set_poincare_poly(self):
+        output_dict = dict()
+        for i in range(len(self.linear_maps)):
+            j = i + 1
+            if self.grading_mod != 0:
+                j %= self.grading_mod
+            rank_im = self.linear_maps[i].matrix.rank_im
+            rank_ker = self.linear_maps[i].matrix.rank_ker
+            if i in output_dict.keys():
+                output_dict[i] += rank_ker
+            else:
+                output_dict[i] = rank_ker
+            if j in output_dict.keys():
+                output_dict[j] -= rank_im
+            else:
+                output_dict[j] = -rank_im
+        t = sympy.Symbol('t')
+        output = 0
+        for i in output_dict.keys():
+            output += output_dict[i] * (t ** i)
+        self.poincare_poly = output
 
 
 class DGA(DGBase):
@@ -247,7 +305,7 @@ class DGA(DGBase):
         self._set_augmentations()
 
     def get_verbose_subs_from_aug(self, aug):
-        """Extend aug to all the things it must be zero on
+        """Extend aug to all generators. This means setting non-zero graded generators to zero.
 
         :param aug: dict
         :return: dict
