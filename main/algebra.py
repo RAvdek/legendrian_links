@@ -28,7 +28,7 @@ class Differential(object):
     def bilinearize(self, subs_1, subs_2):
         """Return bilinearized differential should use expression.args to capture monomials and then .args again to get
         individual terms"""
-        monoms = self.expression.args
+        monoms = sympy.sympify(self.expression).args
         # eliminate constant terms
         monoms = [m for m in monoms if not m.is_Number]
         output_summands = []
@@ -47,8 +47,7 @@ class Differential(object):
                     factor_2 = prod([s.subs(subs_2) for s in args[i+1:]])
                     summand = coeff * factor_1 * linear_term * factor_2
                     output_summands.append(summand)
-        return sum(output_summands)
-
+        return Differential(expression=sum(output_summands), coeff_mod=self.coeff_mod)
 
 
 class Matrix(object):
@@ -69,6 +68,21 @@ class Matrix(object):
     def __init__(self, values, coeff_mod=0, lazy_ref=False):
         self.lazy_ref = lazy_ref
         self.values = np.array(values)
+
+        wrong_shape = len(self.values.shape) != 2
+        if wrong_shape:
+            if self.values.shape[0] == 0:
+                self.n_rows = 0
+                self.n_cols = 0
+                self.ref = self
+                self.ref_q = self
+                self.ref_q_inv = self
+                self.rank_im = 0
+                self.rank_ker = 0
+                return
+            else:
+                raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
+
         self.n_rows = self.values.shape[0]
         self.n_cols = self.values.shape[1]
         self.coeff_mod = coeff_mod
@@ -187,7 +201,7 @@ class LinearMap(object):
         for i in range(len(self.input_vars)):
             for j in range(len(self.range_symbols)):
                 temp_subs = {s: 0 if s != self.range_symbols[j] else 1 for s in self.range_symbols}
-                values[j][i] = self.coeff_dict[self.input_vars[i]].subs(temp_subs)
+                values[j][i] = sympy.sympify(self.coeff_dict[self.input_vars[i]]).subs(temp_subs)
         self.matrix = Matrix(values=values, coeff_mod=self.coeff_mod)
 
 
@@ -263,7 +277,7 @@ class ChainComplex(DGBase):
                 j %= self.grading_mod
             range_symbols = [s for s in self.symbols if self.gradings[s] == j]
             domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
-            diffs = {s: self.differentials[s] for s in domain_symbols}
+            diffs = {s: self.differentials[s].expression for s in domain_symbols}
             self.linear_maps[i] = LinearMap(
                 coeff_dict=diffs,
                 range_symbols=range_symbols,
@@ -295,7 +309,7 @@ class ChainComplex(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0):
+    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0, lazy_bilin=True):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,
@@ -303,6 +317,11 @@ class DGA(DGBase):
             grading_mod=grading_mod
         )
         self._set_augmentations()
+        self.n_augs = len(self.augmentations)
+        self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
+        self.lazy_bilin = lazy_bilin
+        if not lazy_bilin:
+            self.set_all_bilin()
 
     def get_verbose_subs_from_aug(self, aug):
         """Extend aug to all generators. This means setting non-zero graded generators to zero.
@@ -322,6 +341,27 @@ class DGA(DGBase):
             g: v.bilinearize(subs_1, subs_2)
             for g, v in self.differentials.items()
         }
+
+    def set_all_bilin(self):
+        for i in range(self.n_augs):
+            for j in range(self.n_augs):
+                self.bilin_polys[i][j] = self.get_bilin_poly(i, j)
+
+    def get_bilin_cx(self, aug_ind_1, aug_ind_2):
+        aug_1 = self.augmentations[aug_ind_1]
+        aug_2 = self.augmentations[aug_ind_2]
+        bilin_diffs = self.get_bilin_differential(aug_1, aug_2)
+        return ChainComplex(
+            gradings=self.gradings,
+            differentials=bilin_diffs,
+            grading_mod=self.grading_mod,
+            coeff_mod=self.coeff_mod
+        )
+
+    def get_bilin_poly(self, aug_ind_1, aug_ind_2):
+        """Define the bilinearized complex for augmentations, indicated by their indices"""
+        cx = self.get_bilin_cx(aug_ind_1=aug_ind_1, aug_ind_2=aug_ind_2)
+        return cx.poincare_poly
 
     def are_homotopy_equivalent(self, aug_1, aug_2):
         """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field
@@ -343,20 +383,6 @@ class DGA(DGBase):
         :return:
         """
         raise NotImplementedError()
-
-    def bilinearized_poincare_poly(self, aug_1, aug_2):
-        """If we assume that the base field is a prime (so that the coeff ring is a field) then we don't need to
-        understand the homology groups in terms of generators and relations. We can get the ith betti number by
-        b_i = dim(ker del_i) - rank del_{i-1}. Both of these should be available in sympy.
-
-        :param aug_1:
-        :param aug_2:
-        :return:
-        """
-        raise NotImplementedError()
-
-    def linearized_poincare_poly(self, aug):
-        return self.bilinearized_poincare_poly(aug, aug)
 
     def _set_augmentations(self):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs

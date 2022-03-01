@@ -31,6 +31,20 @@
   </tr>
   {% endfor %}
 </table>
+<br><br>
+{# Not yet ready
+Poincare polynomials of augmentations
+<table>
+  <tr>
+    <th>Aug indices</th>{% for j in range(ctx["n_augs"]) %}<th>{{ j }}</th>{% endfor %}
+  </tr>
+  {% for i in range(ctx["n_augs"]) %}
+  <tr>
+    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys"][i][j] }}</th>{% endfor %}
+  </tr>
+  {% endfor %}
+#}
+</table>
 {% else %}
 No non-trivial augmentations found for {{ ctx["name"] }}
 {% endif %}

@@ -1,4 +1,8 @@
 import sympy
+import utils
+
+
+LOG = utils.get_logger(__name__)
 
 
 def zero_set(polys, symbols, modulus=2, existence_only=False):
@@ -48,8 +52,25 @@ def finite_field_elements(modulus):
 
 
 def is_linear(poly):
-    monom_orders = [sum(m) for m in poly.monoms()]
-    return all([mo == 1 for mo in monom_orders])
+    if isinstance(poly, int):
+        if poly == 0:
+            return True
+        else:
+            return False
+    args = poly.args
+    for monom in args:
+        if isinstance(monom, int):
+            return False
+        if isinstance(monom, sympy.Symbol):
+            return True
+        LOG.info(args)
+        LOG.info(monom)
+        m_args = monom.args
+        if isinstance(m_args[0], int):
+            m_args = m_args[1:]
+        if len(m_args) != 1:
+            return False
+    return True
 
 
 def highest_frequency_symbol(polys, symbols):
