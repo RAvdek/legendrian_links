@@ -488,7 +488,7 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[]):
+    def __init__(self, n_strands, front_crossings=[], auto_lch=False, auto_rsft=False):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
 
@@ -498,20 +498,18 @@ class PlatDiagram(object):
         # wait to set crossings until the line segments have been labeled
         self._set_chords()
         self._set_knots()
-        self._set_lch_graded_by()
         self._set_composable_pairs()
         self._set_capping_paths()
         self._set_plat_segments()
         self._set_disk_graph()
         self._set_disks()
         self._set_disk_corners()
-        self._set_lch_generators()
-        self._set_lch_dga()
-        if not self.link_is_connected:
-            self._set_composable_admissible_words()
-            self._set_rsft_graded_by()
-            self._set_rsft_generators()
-            self._set_rsft_dga()
+        self.auto_lch = auto_lch
+        if auto_lch:
+            self.set_lch()
+        self.auto_rsft = auto_rsft
+        if auto_rsft:
+            self.set_rsft()
 
     def get_line_segment_array(self):
         return [
@@ -641,6 +639,17 @@ class PlatDiagram(object):
                 return output
             output &= (word[-1], word[0]) in self.composable_pairs
             return output
+
+    def set_lch(self):
+        self._set_lch_graded_by()
+        self._set_lch_generators()
+        self._set_lch_dga()
+
+    def set_rsft(self):
+        self._set_composable_admissible_words()
+        self._set_rsft_graded_by()
+        self._set_rsft_generators()
+        self._set_rsft_dga()
 
     def _set_line_segments(self):
         lines = []

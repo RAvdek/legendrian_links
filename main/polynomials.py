@@ -52,24 +52,26 @@ def finite_field_elements(modulus):
 
 
 def is_linear(poly):
-    if isinstance(poly, int):
-        if poly == 0:
-            return True
+    poly = sympy.sympify(poly)
+    if poly.is_number:
+        if poly != 0:
+            return False
         else:
-            return False
-    args = poly.args
-    for monom in args:
-        if isinstance(monom, int):
-            return False
-        if isinstance(monom, sympy.Symbol):
             return True
-        LOG.info(args)
-        LOG.info(monom)
-        m_args = monom.args
-        if isinstance(m_args[0], int):
-            m_args = m_args[1:]
-        if len(m_args) != 1:
-            return False
+    if poly.is_symbol:
+        return True
+    for monom in poly.args:
+        if monom.is_number:
+            if monom != 0:
+                return False
+        if monom.is_symbol:
+            continue
+        else:
+            args = monom.args
+            if args[0].is_number:
+                args = args[1:]
+            if len(args) > 1:
+                return False
     return True
 
 

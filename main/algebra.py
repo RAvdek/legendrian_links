@@ -47,7 +47,8 @@ class Differential(object):
                     factor_2 = prod([s.subs(subs_2) for s in args[i+1:]])
                     summand = coeff * factor_1 * linear_term * factor_2
                     output_summands.append(summand)
-        return Differential(expression=sum(output_summands), coeff_mod=self.coeff_mod)
+        output = sum(output_summands)
+        return Differential(expression=output, coeff_mod=self.coeff_mod)
 
 
 class Matrix(object):
@@ -71,17 +72,8 @@ class Matrix(object):
 
         wrong_shape = len(self.values.shape) != 2
         if wrong_shape:
-            if self.values.shape[0] == 0:
-                self.n_rows = 0
-                self.n_cols = 0
-                self.ref = self
-                self.ref_q = self
-                self.ref_q_inv = self
-                self.rank_im = 0
-                self.rank_ker = 0
-                return
-            else:
-                raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
+            self._init_wrong_shape()
+            return
 
         self.n_rows = self.values.shape[0]
         self.n_cols = self.values.shape[1]
@@ -98,6 +90,19 @@ class Matrix(object):
 
     def __repr__(self):
         return str(self.values)
+
+    def _init_wrong_shape(self):
+        if self.values.shape[0] == 0:
+            self.n_rows = 0
+            self.n_cols = 0
+            self.ref = self
+            self.ref_q = self
+            self.ref_q_inv = self
+            self.rank_im = 0
+            self.rank_ker = 0
+            return
+        else:
+            raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
 
     def multiply(self, other):
         """Multiply self with another Matrix. Must have appropriate dimensions and have the same coeff modulus.
@@ -164,13 +169,13 @@ class Matrix(object):
 
     def _partial_row_reduce(self, ref, q, q_inv, k, l):
         for i in range(k + 1, q.shape[0]):
-            q = (ref[i, l] // ref[k, l])
+            c = (ref[i, l] // ref[k, l])
             if self.coeff_mod != 0:
-                q %= self.coeff_mod
+                c %= self.coeff_mod
             # row add i,k,-q
-            ref[i] += (-q * ref[k])
-            q_inv[i] += (-q * q_inv[k])  # row add
-            q[:, k] += (q * q[:, i])  # column add (note i,k are switched)
+            ref[i] += (-c * ref[k])
+            q_inv[i] += (-c * q_inv[k])  # row add
+            q[:, k] += (c * q[:, i])  # column add (note i,k are switched)
             if self.coeff_mod != 0:
                 ref[i] %= self.coeff_mod
                 q_inv[i] %= self.coeff_mod
@@ -197,11 +202,13 @@ class LinearMap(object):
         self.input_vars = list(self.coeff_dict.keys())
 
     def _set_matrix(self):
-        values = [[0]*len(self.input_vars) for _ in self.range_symbols]
+        # The dtype should be essential to avoid float arithmetic errors
+        values = np.zeros((len(self.range_symbols), len(self.input_vars)), dtype=np.integer)
         for i in range(len(self.input_vars)):
             for j in range(len(self.range_symbols)):
                 temp_subs = {s: 0 if s != self.range_symbols[j] else 1 for s in self.range_symbols}
-                values[j][i] = sympy.sympify(self.coeff_dict[self.input_vars[i]]).subs(temp_subs)
+                value = sympy.sympify(self.coeff_dict[self.input_vars[i]]).subs(temp_subs)
+                values[j][i] = value
         self.matrix = Matrix(values=values, coeff_mod=self.coeff_mod)
 
 
@@ -272,7 +279,7 @@ class ChainComplex(DGBase):
     def _set_linear_maps(self):
         self.linear_maps = dict()
         for i in self.gradings.values():
-            j = i + 1
+            j = i - 1
             if self.grading_mod != 0:
                 j %= self.grading_mod
             range_symbols = [s for s in self.symbols if self.gradings[s] == j]
@@ -287,7 +294,7 @@ class ChainComplex(DGBase):
     def _set_poincare_poly(self):
         output_dict = dict()
         for i in range(len(self.linear_maps)):
-            j = i + 1
+            j = i - 1
             if self.grading_mod != 0:
                 j %= self.grading_mod
             rank_im = self.linear_maps[i].matrix.rank_im
@@ -309,7 +316,7 @@ class ChainComplex(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0, lazy_bilin=True):
+    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0, lazy_bilin=False):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,

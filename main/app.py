@@ -39,15 +39,15 @@ def get_template_context(pd):
     disk_corners = pd.disk_corners
     chords = [
         {
-            "string": str(pd.get_lch_generator_from_chord(chord)),
-            "grading": str(pd.get_lch_generator_from_chord(chord).grading),
+            "string": str(chord),
             "from_knot": chord.bottom_line_segment.knot_label,
-            "to_knot": chord.top_line_segment.knot_label,
-            "lch_del": str(pd.lch_dga.differentials[pd.get_lch_generator_from_chord(chord).symbol])
+            "to_knot": chord.top_line_segment.knot_label
         }
         for chord in pd.chords]
-    dgas = [get_dga_context(pd.lch_dga, name="LCH")]
-    if not pd.link_is_connected:
+    dgas = []
+    if pd.auto_lch:
+        dgas.append(get_dga_context(pd.lch_dga, name="LCH"))
+    if pd.auto_rsft:
         dgas.append(get_dga_context(pd.rsft_dga, name="RSFT"))
     template_context = {
         'svg_context': get_diagram_context(pd),
@@ -123,21 +123,34 @@ def get_dga_context(dga, name):
 
 @APP.route('/')
 def home():
-    data = request.args.get('link')
-    if data is not None:
-        pd = ll.PlatDiagram(**data)
+    n_strands = request.args.get('n_strands')
+    if n_strands is not None:
+        n_strands = int(n_strands)
+        crossings = request.args.get('crossings')
+        if crossings is not None:
+            crossings = [int(x) for x in crossings.split(",")]
+        auto_lch = True
+        auto_rsft = False
+        auto_dga = request.args.get('auto_dga')
+        if auto_dga is not None:
+            auto_dgas = auto_dga.lower().split(',')
+            if 'rsft' in auto_dgas:
+                auto_lch = False
+                auto_rsft = True
+            if 'lch' in auto_dgas:
+                auto_lch = True
+        pd = ll.PlatDiagram(
+            n_strands=n_strands,
+            front_crossings=crossings,
+            auto_lch=auto_lch,
+            auto_rsft=auto_rsft
+        )
     else:
-        n_strands = request.args.get('n_strands')
-        if n_strands is not None:
-            n_strands = int(n_strands)
-            crossings = request.args.get('crossings')
-            if crossings is not None:
-                crossings = [int(x) for x in crossings.split(",")]
-            pd = ll.PlatDiagram(n_strands=n_strands, front_crossings=crossings)
-        else:
-            data = LINKS[DEFAULT_LINK_KEY].copy()
-            data.pop('comment')
-            pd = ll.PlatDiagram(**data)
+        data = LINKS[DEFAULT_LINK_KEY].copy()
+        data.pop('comment')
+        data['auto_lch'] = True
+        data['auto_rsft'] = False
+        pd = ll.PlatDiagram(**data)
     template_context = get_template_context(pd=pd)
     context = INDEX_TEMPLATE.render(**template_context)
     return make_response(context)

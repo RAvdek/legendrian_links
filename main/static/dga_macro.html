@@ -1,4 +1,36 @@
 {% macro dga(ctx) -%}
+{% if ctx["has_augs"] %}
+Poincare polynomials for {{ ctx["name"] }} augmentations
+<table>
+  <tr>
+    <th>Aug indices</th>{% for j in range(ctx["n_augs"]) %}<th>{{ j }}</th>{% endfor %}
+  </tr>
+  {% for i in range(ctx["n_augs"]) %}
+  <tr>
+    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys"][i][j] }}</th>{% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+<br>
+{{ ctx["name"] }} has {{ ctx["n_augs"] }} augmentations
+<table>
+  <tr>
+    {% for g in ctx["deg_0_gens"] %}
+    <th>{{ g["name"] }}</th>
+    {% endfor %}
+  </tr>
+  {% for aug in ctx["augs"] %}
+  <tr>
+    {% for g in ctx["deg_0_gens"] %}
+    <td>{{ aug[g["name"]] }}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+No non-trivial augmentations found for {{ ctx["name"] }}
+{% endif %}
+<br>
 <table>
   <tr>
     <th>{{ ctx["name"] }} generators</th>
@@ -14,38 +46,4 @@
   {% endfor %}
 </table>
 <br>
-{% if ctx["has_augs"] %}
-{{ ctx["name"] }} has {{ ctx["n_augs"] }} augmentations
-<br>
-<table>
-  <tr>
-    {% for g in ctx["deg_0_gens"] %}
-    <th>{{ g["name"] }}</th>
-    {% endfor %}
-  </tr>
-  {% for aug in ctx["augs"] %}
-  <tr>
-    {% for g in ctx["deg_0_gens"] %}
-    <td>{{ aug[g["name"]] }}</td>
-    {% endfor %}
-  </tr>
-  {% endfor %}
-</table>
-<br><br>
-{# Not yet ready
-Poincare polynomials of augmentations
-<table>
-  <tr>
-    <th>Aug indices</th>{% for j in range(ctx["n_augs"]) %}<th>{{ j }}</th>{% endfor %}
-  </tr>
-  {% for i in range(ctx["n_augs"]) %}
-  <tr>
-    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys"][i][j] }}</th>{% endfor %}
-  </tr>
-  {% endfor %}
-#}
-</table>
-{% else %}
-No non-trivial augmentations found for {{ ctx["name"] }}
-{% endif %}
 {%- endmacro %}

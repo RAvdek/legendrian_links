@@ -30,6 +30,18 @@ def is_nonrepeating(array):
     return True
 
 
+def unique_elements(array):
+    """Get unique elements from list. Faster than list(set(array))
+
+    :param array: list
+    :return: list
+    """
+    output = set()
+    for x in array:
+        output.add(x)
+    return list(output)
+
+
 def rotate(array, n):
     """Rotates a tuple so that the nth entry is in the 0th slot
     rotate([0, 1, 2, 3, 4], 2) = [2, 3, 4, 0, 1]
