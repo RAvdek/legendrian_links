@@ -28,26 +28,24 @@ class Differential(object):
     def bilinearize(self, subs_1, subs_2):
         """Return bilinearized differential should use expression.args to capture monomials and then .args again to get
         individual terms"""
-        monoms = sympy.sympify(self.expression).args
-        # eliminate constant terms
-        monoms = [m for m in monoms if not m.is_Number]
-        output_summands = []
-        for m in monoms:
-            if m.is_symbol:
-                output_summands.append(m)
-            else:
-                args = m.args
-                coeff = 1
-                if args[0].is_number:
-                    coeff = args[0]
-                    args = args[1:]
-                for i in range(len(args)):
-                    factor_1 = prod([s.subs(subs_1) for s in args[:i]])
-                    linear_term = args[i]
-                    factor_2 = prod([s.subs(subs_2) for s in args[i+1:]])
-                    summand = coeff * factor_1 * linear_term * factor_2
-                    output_summands.append(summand)
-        output = sum(output_summands)
+        poly = sympy.sympify(self.expression)
+        output = 0
+        if not poly.is_number:
+            # override use of defaultdict
+            coeff_dict = dict(poly.as_coefficients_dict())
+            output_summands = []
+            for monom, coeff in coeff_dict.items():
+                if monom.is_symbol:
+                    output_summands.append(coeff * monom)
+                elif not monom.is_number:
+                    args = monom.args
+                    for i in range(len(args)):
+                        factor_1 = prod([s.subs(subs_1) for s in args[:i]])
+                        linear_term = args[i]
+                        factor_2 = prod([s.subs(subs_2) for s in args[i+1:]])
+                        summand = coeff * factor_1 * linear_term * factor_2
+                        output_summands.append(summand)
+            output = sum(output_summands)
         return Differential(expression=output, coeff_mod=self.coeff_mod)
 
 
