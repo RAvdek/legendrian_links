@@ -16,6 +16,18 @@ def get_logger(name):
     return logger
 
 
+LOG = get_logger(__name__)
+
+
+def log_start_stop(func):
+    def timed(*args, **kwargs):
+        LOG.info(f"Starting execution {func.__name__}")
+        result = func(*args, **kwargs)
+        LOG.info(f"Ending execution {func.__name__}")
+        return result
+    return timed
+
+
 # Methods for manipulating lists
 
 

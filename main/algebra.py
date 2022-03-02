@@ -1,10 +1,11 @@
+from collections import Counter
 from math import prod
 import numpy as np
 import sympy
 import utils
 import polynomials
 
-LOG = utils.get_logger(__name__)
+LOG = utils.LOG
 
 
 class Differential(object):
@@ -323,6 +324,7 @@ class DGA(DGBase):
         )
         self._set_augmentations()
         self.n_augs = len(self.augmentations)
+        LOG.info(f"Found {self.n_augs} augmentations of DGA")
         self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
         self.lazy_bilin = lazy_bilin
         if not lazy_bilin:
@@ -347,26 +349,45 @@ class DGA(DGBase):
             for g, v in self.differentials.items()
         }
 
+    @utils.log_start_stop
     def set_all_bilin(self):
+        bilin_counter = 0
+        bilin_diff_storage = list()
         for i in range(self.n_augs):
             for j in range(self.n_augs):
-                self.bilin_polys[i][j] = self.get_bilin_poly(i, j)
-
-    def get_bilin_cx(self, aug_ind_1, aug_ind_2):
-        aug_1 = self.augmentations[aug_ind_1]
-        aug_2 = self.augmentations[aug_ind_2]
-        bilin_diffs = self.get_bilin_differential(aug_1, aug_2)
-        return ChainComplex(
-            gradings=self.gradings,
-            differentials=bilin_diffs,
-            grading_mod=self.grading_mod,
-            coeff_mod=self.coeff_mod
-        )
-
-    def get_bilin_poly(self, aug_ind_1, aug_ind_2):
-        """Define the bilinearized complex for augmentations, indicated by their indices"""
-        cx = self.get_bilin_cx(aug_ind_1=aug_ind_1, aug_ind_2=aug_ind_2)
-        return cx.poincare_poly
+                aug_1 = self.augmentations[i]
+                aug_2 = self.augmentations[j]
+                bilin_diff = self.get_bilin_differential(aug_1, aug_2)
+                storage_matches = [
+                    i for i in range(len(bilin_diff_storage)) if bilin_diff_storage[i]["diff"] == bilin_diff
+                ]
+                if len(storage_matches) > 0:
+                    i = storage_matches[0]
+                    poincare_poly = bilin_diff_storage[i]["poincare_poly"]
+                    bilin_diff_storage[i]["augs"].append([i, j])
+                else:
+                    cx = ChainComplex(
+                        gradings=self.gradings,
+                        differentials=bilin_diff,
+                        grading_mod=self.grading_mod,
+                        coeff_mod=self.coeff_mod
+                    )
+                    poincare_poly = cx.poincare_poly
+                    bilin_diff_storage.append(
+                        {
+                            "diff": bilin_diff,
+                            "poincare_poly": poincare_poly,
+                            "augs": [[i, j]]
+                        }
+                    )
+                self.bilin_polys[i][j] = poincare_poly
+                bilin_counter += 1
+                if bilin_counter % 20 == 0:
+                    LOG.info(f"Computed {bilin_counter} bilinearized Poincare polys so far")
+                    diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
+                    LOG.info(f"Frequency of repetition in bilin homologies so far: {diff_frequency}")
+        diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
+        LOG.info(f"Frequency of repetition in bilin homologies: {diff_frequency}")
 
     def are_homotopy_equivalent(self, aug_1, aug_2):
         """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field
@@ -389,6 +410,7 @@ class DGA(DGBase):
         """
         raise NotImplementedError()
 
+    @utils.log_start_stop
     def _set_augmentations(self):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
         if self.coeff_mod == 0:

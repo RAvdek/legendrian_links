@@ -24,8 +24,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
-- Improved logging to track long execution timing.
-- General satellite construction.
+- `_set_augmentations` is taking a very long time for RSFT. It could be possible to speed it up by saying that cyclically equiv generators ave the same differentials when we use ZZ2 coefficients.
+- Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Copy knot tables.
 - UI: Ordering of generators is annoyingly out of place. Should also count numbers of augs.
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.

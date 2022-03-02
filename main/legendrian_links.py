@@ -1,11 +1,10 @@
-from collections import Counter
 from math import prod
 import sympy
 import algebra
 import utils
 
 
-LOG = utils.get_logger(__name__)
+LOG = utils.LOG
 ZZ = sympy.ZZ
 ZZ2 = sympy.GF(2)
 HALF = sympy.Rational(1, 2)
@@ -521,16 +520,17 @@ class PlatDiagram(object):
 
     def copy_front_crossings(self, n):
         new_front_crossings = []
+
+        # Each left cusp creates these new crossings
         left_triangle = []
         for i in range(1, n):
             left_triangle += [i + 2*j for j in range(n-i)]
-        LOG.info(f"left triangle {left_triangle}")
+        # Each right cusp creates these new crossings
         right_triangle = list(reversed(left_triangle))
-        LOG.info(f"right triangle {right_triangle}")
+        # Each old front crossing creates these new front crossings
         crossing_block = []
         for i in range(n - 1, -1, -1):
             crossing_block += [i + j for j in range(n)]
-        LOG.info(f"Crossing block {crossing_block}")
 
         # Crossings for left cusps
         for i in range(self.n_strands):
@@ -897,6 +897,7 @@ class PlatDiagram(object):
     def _set_disk_corners(self):
         self.disk_corners = [d.disk_corners for d in self.disks]
 
+    @utils.log_start_stop
     def _set_lch_generators(self):
         lch_generators = []
         for chord in self.chords:
@@ -912,6 +913,7 @@ class PlatDiagram(object):
             )
         self.lch_generators = lch_generators
 
+    @utils.log_start_stop
     def _set_lch_dga(self):
         lch_disks = [d for d in self.disks if d.is_lch()]
         lch_del = {g: 0 for g in self.lch_generators}
