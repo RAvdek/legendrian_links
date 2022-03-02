@@ -139,9 +139,15 @@ def home():
                 auto_rsft = True
             if 'lch' in auto_dgas:
                 auto_lch = True
+        n_copy = request.args.get('n_copy')
+        if n_copy is not None:
+            n_copy = int(n_copy)
+        else:
+            n_copy = 1
         pd = ll.PlatDiagram(
             n_strands=n_strands,
             front_crossings=crossings,
+            n_copy=n_copy,
             auto_lch=auto_lch,
             auto_rsft=auto_rsft
         )

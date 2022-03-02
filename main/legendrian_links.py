@@ -488,9 +488,17 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], auto_lch=False, auto_rsft=False):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, auto_lch=True, auto_rsft=True):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
+        self.n_copy = n_copy
+        self.auto_lch = auto_lch
+        self.auto_rsft = auto_rsft
+
+        if n_copy > 1:
+            self.front_crossings = self.copy_front_crossings(n_copy)
+            self.n_strands = n_copy * self.n_strands
+            self.n_copy = 1
 
         self._set_line_segments()
         self.max_x_left = max([ls.x_left for ls in self.line_segments])
@@ -510,6 +518,35 @@ class PlatDiagram(object):
         self.auto_rsft = auto_rsft
         if auto_rsft:
             self.set_rsft()
+
+    def copy_front_crossings(self, n):
+        new_front_crossings = []
+        left_triangle = []
+        for i in range(1, n):
+            left_triangle += [i + 2*j for j in range(n-i)]
+        LOG.info(f"left triangle {left_triangle}")
+        right_triangle = list(reversed(left_triangle))
+        LOG.info(f"right triangle {right_triangle}")
+        crossing_block = []
+        for i in range(n - 1, -1, -1):
+            crossing_block += [i + j for j in range(n)]
+        LOG.info(f"Crossing block {crossing_block}")
+
+        # Crossings for left cusps
+        for i in range(self.n_strands):
+            if i % 2 == 0:
+                new_front_crossings += [j + n*i for j in left_triangle]
+
+        # New crossings from old
+        for c in self.front_crossings:
+            new_front_crossings += [c*n + j for j in crossing_block]
+
+        # Crossings for right cusps
+        for i in range(self.n_strands):
+            if i % 2 == 0:
+                new_front_crossings += [j + n*i for j in right_triangle]
+
+        return new_front_crossings
 
     def get_line_segment_array(self):
         return [

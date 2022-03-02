@@ -29,6 +29,7 @@ Chords are labeled by their x-coordinates:
 {{ dga_macro.dga(ctx) }}
 {% if not loop.last %}<br><br>{% endif %}
 {% endfor %}
+{# Declutter
 <br><br>
 A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
 <br><br>
@@ -37,4 +38,5 @@ A total of {{ n_disks }} holomorphic disks of index=1 with asymptotics:
     {{c.chord.top_line_segment.x_left}}{{c.CORNER_TYPES[c.corner]}}{% if not loop.last %}, {% endif %}
   {% endfor %}<br>
 {% endfor %}
+#}
 </body>

@@ -25,6 +25,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 ## Features
 
 - Improved logging to track long execution timing.
+- General satellite construction.
+- Copy knot tables.
 - UI: Ordering of generators is annoyingly out of place. Should also count numbers of augs.
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Should be able to use Groebner bases to tell if the commutative version of a DGA is trivial with Z/2 ceoffs. Implement in dga.py.
