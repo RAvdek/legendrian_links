@@ -416,6 +416,7 @@ class DGA(DGBase):
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
         zero_graded_symbols = [g for g in self.symbols if self.gradings[g] == 0]
+        LOG.info(f"DGA has {len(zero_graded_symbols)} generators with 0 grading")
         symbols_to_comm_symbols = {g: sympy.Symbol(str(g), commutative=True) for g in zero_graded_symbols}
         comm_symbols = list(symbols_to_comm_symbols.values())
         if len(comm_symbols) == 0:
@@ -430,9 +431,9 @@ class DGA(DGBase):
         for exp in d_expressions:
             polys.append(sympy.sympify(exp).subs(zero_substitutions))
         polys = [p.subs(symbols_to_comm_symbols) for p in polys]
+        polys = utils.unique_elements(polys)
         if 0 in polys:
             polys.remove(0)
-        polys = list(set(polys))
         comm_augmentations = polynomials.zero_set(polys=polys, symbols=comm_symbols, modulus=self.coeff_mod)
         # comm_augs will be a list of dicts whose keys are the commutative symbols.
         # We need to switch them back!

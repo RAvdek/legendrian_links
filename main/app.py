@@ -50,6 +50,7 @@ def get_template_context(pd):
     if pd.auto_rsft:
         dgas.append(get_dga_context(pd.rsft_dga, name="RSFT"))
     template_context = {
+        'front_crossings': ','.join([str(c) for c in pd.front_crossings]),
         'svg_context': get_diagram_context(pd),
         'chords': chords,
         'n_disks': len(disk_corners),
