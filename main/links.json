@@ -23,5 +23,10 @@
     "comment": "Polyfillable link from https://arxiv.org/abs/1307.7998",
     "n_strands": 6,
     "front_crossings": [3, 1, 2, 2, 1, 3, 3]
+  },
+  "m9_46": {
+    "comment": "Slice knot from https://arxiv.org/pdf/1301.3767.pdf. Has 2 homotopy classes of augmentations.",
+    "n_strands": 6,
+    "front_crossings": [1,2,3,4,2,0,1,4,1,2,0,3,1,3,2,4,1,3]
   }
 }

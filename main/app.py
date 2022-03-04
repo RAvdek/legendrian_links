@@ -128,7 +128,9 @@ def home():
     if n_strands is not None:
         n_strands = int(n_strands)
         crossings = request.args.get('crossings')
-        if crossings is not None:
+        if crossings is None:
+            crossings = []
+        else:
             crossings = [int(x) for x in crossings.split(",")]
         auto_lch = True
         auto_rsft = False

@@ -196,6 +196,9 @@ class LinearMap(object):
         self._set_input_vars()
         self._set_matrix()
 
+    def __repr__(self):
+        return str(self.coeff_dict)
+
     def _set_input_vars(self):
         """Encode input and output symbols as `onehot` vectors so that they could be turned into a matrix"""
         self.input_vars = list(self.coeff_dict.keys())
@@ -276,6 +279,7 @@ class ChainComplex(DGBase):
                 raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
 
     def _set_linear_maps(self):
+        # We have to use a dictionary because the degrees may be non-positive
         self.linear_maps = dict()
         for i in self.gradings.values():
             j = i - 1
@@ -292,12 +296,13 @@ class ChainComplex(DGBase):
 
     def _set_poincare_poly(self):
         output_dict = dict()
-        for i in range(len(self.linear_maps)):
+        for i in self.linear_maps.keys():
             j = i - 1
             if self.grading_mod != 0:
                 j %= self.grading_mod
-            rank_im = self.linear_maps[i].matrix.rank_im
-            rank_ker = self.linear_maps[i].matrix.rank_ker
+            linear_map = self.linear_maps[i]
+            rank_im = linear_map.matrix.rank_im
+            rank_ker = linear_map.matrix.rank_ker
             if i in output_dict.keys():
                 output_dict[i] += rank_ker
             else:
@@ -422,7 +427,9 @@ class DGA(DGBase):
         if len(comm_symbols) == 0:
             self.augmentations = []
             return
-        d_expressions = [d.expression for d in self.differentials.values()]
+        # Only need to mod out by differentials of degree 1 elements
+        d_expressions = [v.expression for k,v in self.differentials.items() if self.gradings[k] == 1]
+        LOG.info(f"Differentials required to compute augs: {len(d_expressions)}")
         # Set all non-zero graded elements to zero.
         zero_substitutions = {g: 0 for g in self.symbols if self.gradings[g] != 0}
         # Make polynomials in commutative variables of the deg=0 generators.
@@ -434,6 +441,7 @@ class DGA(DGBase):
         polys = utils.unique_elements(polys)
         if 0 in polys:
             polys.remove(0)
+        LOG.info(f"Polynomials required to compute augs after simplification: {len(polys)}")
         comm_augmentations = polynomials.zero_set(polys=polys, symbols=comm_symbols, modulus=self.coeff_mod)
         # comm_augs will be a list of dicts whose keys are the commutative symbols.
         # We need to switch them back!

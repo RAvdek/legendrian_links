@@ -838,12 +838,14 @@ class PlatDiagram(object):
         else:
             self.rsft_graded_by = ZZ2
 
+    @utils.log_start_stop
     def _set_composable_pairs(self):
         self.composable_pairs = [
             (chord_1, chord_2) for chord_1 in self.chords for chord_2 in self.chords
             if chord_1.is_composable_with(chord_2)
         ]
 
+    @utils.log_start_stop
     def _set_capping_paths(self):
         self.capping_paths = []
         for start_chord, end_chord in self.composable_pairs:
@@ -865,6 +867,7 @@ class PlatDiagram(object):
                 )
             )
 
+    @utils.log_start_stop
     def _set_plat_segments(self):
         max_left_x = max([ls.x_left for ls in self.line_segments])
         plat_segments = []
@@ -881,6 +884,7 @@ class PlatDiagram(object):
             plat_segments.append(ps)
         self.plat_segments = plat_segments
 
+    @utils.log_start_stop
     def _set_disk_graph(self):
         disk_graph = DiskSegmentGraph(n_segments=len(self.plat_segments))
         for x in range(len(self.plat_segments)):
@@ -891,9 +895,12 @@ class PlatDiagram(object):
         disk_graph.compute_edges()
         self.disk_graph = disk_graph
 
+    @utils.log_start_stop
     def _set_disks(self):
         self.disks = self.disk_graph.compute_disks()
+        LOG.info(f"Found {len(self.disks)} rigid holomorphic disks")
 
+    @utils.log_start_stop
     def _set_disk_corners(self):
         self.disk_corners = [d.disk_corners for d in self.disks]
 
@@ -938,6 +945,7 @@ class PlatDiagram(object):
         gradings = {g.symbol: g.grading for g in self.lch_generators}
         self.lch_dga = algebra.DGA(gradings=gradings, differentials=lch_del, coeff_mod=2)
 
+    @utils.log_start_stop
     def _set_composable_admissible_words(self):
         """Store all composable admissible (not necessarily cyclic) words in memory for lookup access"""
         # length 1 composable words
@@ -953,6 +961,7 @@ class PlatDiagram(object):
             composable_admissible_words.append(new_words)
         self.composable_admissible_words = composable_admissible_words
 
+    @utils.log_start_stop
     def _set_rsft_generators(self):
         cyclic_composable_admissible_words = []
         for wl in range(len(self.composable_admissible_words)):
@@ -974,6 +983,7 @@ class PlatDiagram(object):
                     )
         self.rsft_generators = cyclic_composable_admissible_words
 
+    @utils.log_start_stop
     def _set_rsft_dga(self):
         disks = self.disks
         rsft_del = {w: 0 for w in self.rsft_generators}

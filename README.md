@@ -24,8 +24,10 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
+- Set augmentations eating up 100% CPU for 2-copy of 9_46. It's the fault of GroebnerBasis :(
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
-- Copy knot tables.
+- Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
+- Copy knot tables. Have to remember how to translate Sivek front crossing notation to mine.
 - UI: Ordering of generators is annoyingly out of place. Should also count numbers of augs.
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Should be able to use Groebner bases to tell if the commutative version of a DGA is trivial with Z/2 ceoffs. Implement in dga.py.
