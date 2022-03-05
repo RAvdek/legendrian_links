@@ -356,6 +356,8 @@ class DGA(DGBase):
 
     @utils.log_start_stop
     def set_all_bilin(self):
+        # How frequently to log?
+        LOG_FREQUENCY = 20
         bilin_counter = 0
         bilin_diff_storage = list()
         for i in range(self.n_augs):
@@ -387,8 +389,8 @@ class DGA(DGBase):
                     )
                 self.bilin_polys[i][j] = poincare_poly
                 bilin_counter += 1
-                if bilin_counter % 20 == 0:
-                    LOG.info(f"Computed {bilin_counter} bilinearized Poincare polys so far")
+                if bilin_counter % LOG_FREQUENCY == 0:
+                    LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
                     diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
                     LOG.info(f"Frequency of repetition in bilin homologies so far: {diff_frequency}")
         diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
