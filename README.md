@@ -28,6 +28,8 @@ A URL should appear which you can access from your web browser. Parameters `n_st
   - Split at nodes without simplifying after a timeout. This creates more problems which are simpler.
   - Try running this on a more powerful computer... This is not practical for sharing software.
   - Incorporate functionality for non-plat. This is high effort but could be high payoff. Biggest issue is that there could be infinitely many disks.
+  - Could find all LCH augmentations first and then try upgrading them to augmentations of the two copy algebras and so on. This feels like high liklihood of success but with high effort.
+  - For memory issues, we could see what variables we could tear down. `PlatDiagram.capping_paths` feels very expensive in particular and are not used to do anything for the time being. There are also the `PlatDiagram.composable_pairs` is also very large. Could also try to clean up unused search nodes. I think the only thing needed for differential computations are the gradings and `PlatDiagram.disk_corners`.
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
 - Copy knot tables. Have to remember how to translate Sivek front crossing notation to mine.

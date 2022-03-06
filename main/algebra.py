@@ -424,11 +424,11 @@ class DGA(DGBase):
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
         zero_graded_symbols = [g for g in self.symbols if self.gradings[g] == 0]
         LOG.info(f"DGA has {len(zero_graded_symbols)} generators with 0 grading")
-        symbols_to_comm_symbols = {g: sympy.Symbol(str(g), commutative=True) for g in zero_graded_symbols}
-        comm_symbols = list(symbols_to_comm_symbols.values())
-        if len(comm_symbols) == 0:
+        if len(zero_graded_symbols) == 0:
             self.augmentations = []
             return
+        symbols_to_comm_symbols = {g: sympy.Symbol(str(g), commutative=True) for g in zero_graded_symbols}
+        comm_symbols = list(symbols_to_comm_symbols.values())
         # Only need to mod out by differentials of degree 1 elements
         d_expressions = [v.expression for k,v in self.differentials.items() if self.gradings[k] == 1]
         LOG.info(f"Differentials required to compute augs: {len(d_expressions)}")
@@ -437,8 +437,10 @@ class DGA(DGBase):
         # Make polynomials in commutative variables of the deg=0 generators.
         # This is required to apply zero_set which only works with commuting variables!
         polys = []
+        LOG.info(f"Eliminating degree-non-zero terms from polys")
         for exp in d_expressions:
             polys.append(sympy.sympify(exp).subs(zero_substitutions))
+        LOG.info(f"Replacing non-commutative symbols with commutative")
         polys = [p.subs(symbols_to_comm_symbols) for p in polys]
         polys = utils.unique_elements(polys)
         if 0 in polys:

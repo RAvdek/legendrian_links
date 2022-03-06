@@ -20,6 +20,11 @@ LOG = get_logger(__name__)
 
 
 def log_start_stop(func):
+    """Simple function wrapper to log starting and ending times of a function
+
+    :param func:
+    :return: wrapped func
+    """
     def timed(*args, **kwargs):
         LOG.info(f"Starting execution {func.__name__}")
         result = func(*args, **kwargs)
@@ -33,7 +38,7 @@ def log_start_stop(func):
 
 def is_nonrepeating(array):
     """Are the elements in a tuple unique? Will have to do this over and over...
-    Faster and less memory expensive than `len(set(tuple)) == len(tuple)`
+    Faster and less memory expensive than `len(set(tuple)) == len(tuple)` for large arrays
 
     :param array: list
     :return: Bool
@@ -49,7 +54,7 @@ def is_nonrepeating(array):
 
 
 def unique_elements(array):
-    """Get unique elements from list. Faster than list(set(array))
+    """Get unique elements from list. Faster than list(set(array)) for large arrays
 
     :param array: list
     :return: list
