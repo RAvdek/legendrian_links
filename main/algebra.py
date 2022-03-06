@@ -320,20 +320,24 @@ class ChainComplex(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0, lazy_bilin=False):
+    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
-        self._set_augmentations()
-        self.n_augs = len(self.augmentations)
-        LOG.info(f"Found {self.n_augs} augmentations of DGA")
-        self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
+        self.augmentations = None
+        self.n_augs = None
+        self.bilin_polys = None
+        self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
-        if not lazy_bilin:
-            self.set_all_bilin()
+        if lazy_augs and not lazy_bilin:
+            raise ValueError("DGA cannot autocompute bilinearized polys without autocomputing augmentations")
+        if not lazy_augs:
+            self.set_augmentations()
+            if not lazy_bilin:
+                self.set_all_bilin()
 
     def get_verbose_subs_from_aug(self, aug):
         """Extend aug to all generators. This means setting non-zero graded generators to zero.
@@ -357,7 +361,7 @@ class DGA(DGBase):
     @utils.log_start_stop
     def set_all_bilin(self):
         # How frequently to log?
-        LOG_FREQUENCY = 20
+        log_frequency = 20
         bilin_counter = 0
         bilin_diff_storage = list()
         for i in range(self.n_augs):
@@ -389,7 +393,7 @@ class DGA(DGBase):
                     )
                 self.bilin_polys[i][j] = poincare_poly
                 bilin_counter += 1
-                if bilin_counter % LOG_FREQUENCY == 0:
+                if bilin_counter % log_frequency == 0:
                     LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
                     diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
                     LOG.info(f"Frequency of repetition in bilin homologies so far: {diff_frequency}")
@@ -418,39 +422,100 @@ class DGA(DGBase):
         raise NotImplementedError()
 
     @utils.log_start_stop
-    def _set_augmentations(self):
+    def set_augmentations(self, preset_subs_dict=dict()):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
         zero_graded_symbols = [g for g in self.symbols if self.gradings[g] == 0]
         LOG.info(f"DGA has {len(zero_graded_symbols)} generators with 0 grading")
         if len(zero_graded_symbols) == 0:
-            self.augmentations = []
-            return
-        symbols_to_comm_symbols = {g: sympy.Symbol(str(g), commutative=True) for g in zero_graded_symbols}
-        comm_symbols = list(symbols_to_comm_symbols.values())
-        # Only need to mod out by differentials of degree 1 elements
-        d_expressions = [v.expression for k,v in self.differentials.items() if self.gradings[k] == 1]
-        LOG.info(f"Differentials required to compute augs: {len(d_expressions)}")
-        # Set all non-zero graded elements to zero.
-        zero_substitutions = {g: 0 for g in self.symbols if self.gradings[g] != 0}
-        # Make polynomials in commutative variables of the deg=0 generators.
-        # This is required to apply zero_set which only works with commuting variables!
-        polys = []
-        LOG.info(f"Eliminating degree-non-zero terms from polys")
-        for exp in d_expressions:
-            polys.append(sympy.sympify(exp).subs(zero_substitutions))
-        LOG.info(f"Replacing non-commutative symbols with commutative")
-        polys = [p.subs(symbols_to_comm_symbols) for p in polys]
-        polys = utils.unique_elements(polys)
-        if 0 in polys:
-            polys.remove(0)
-        LOG.info(f"Polynomials required to compute augs after simplification: {len(polys)}")
-        comm_augmentations = polynomials.zero_set(polys=polys, symbols=comm_symbols, modulus=self.coeff_mod)
-        # comm_augs will be a list of dicts whose keys are the commutative symbols.
-        # We need to switch them back!
-        comm_symbols_to_symbols = {v:k for k, v in symbols_to_comm_symbols.items()}
-        augmentations = []
-        for aug in comm_augmentations:
-            augmentations.append({comm_symbols_to_symbols[k]: v for k, v in aug.items()})
+            augmentations = []
+        else:
+            symbols_to_comm_symbols = {g: sympy.Symbol(str(g), commutative=True) for g in zero_graded_symbols}
+            comm_symbols = list(symbols_to_comm_symbols.values())
+            # Only need to mod out by differentials of degree 1 elements
+            d_expressions = [v.expression for k,v in self.differentials.items() if self.gradings[k] == 1]
+            LOG.info(f"Differentials required to compute augs: {len(d_expressions)}")
+            # Set all non-zero graded elements to zero.
+            zero_substitutions = {g: 0 for g in self.symbols if self.gradings[g] != 0}
+            # Make polynomials in commutative variables of the deg=0 generators.
+            # This is required to apply zero_set which only works with commuting variables!
+            polys = []
+            LOG.info(f"Eliminating degree-non-zero terms from polys")
+            for exp in d_expressions:
+                polys.append(sympy.sympify(exp).subs(zero_substitutions))
+            LOG.info(f"Replacing non-commutative symbols with commutative")
+            polys = [p.subs(symbols_to_comm_symbols) for p in polys]
+            polys = utils.unique_elements(polys)
+            if 0 in polys:
+                polys.remove(0)
+            LOG.info(f"Polynomials required to compute augs after simplification: {len(polys)}")
+            comm_augmentations = polynomials.zero_set(
+                polys=polys, symbols=comm_symbols, modulus=self.coeff_mod, subs_dict=preset_subs_dict)
+            # comm_augs will be a list of dicts whose keys are the commutative symbols.
+            # We need to switch them back!
+            comm_symbols_to_symbols = {v:k for k, v in symbols_to_comm_symbols.items()}
+            augmentations = []
+            for aug in comm_augmentations:
+                augmentations.append({comm_symbols_to_symbols[k]: v for k, v in aug.items()})
         self.augmentations = augmentations
+        self.n_augs = len(self.augmentations)
+        LOG.info(f"Found {self.n_augs} augmentations of DGA")
+        self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
+
+
+class MFDGA(DGA):
+
+    def __init__(self, gradings, differentials, filtration_levels,
+                 coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
+        super(MFDGA, self).__init__(
+            gradings=gradings,
+            differentials=differentials,
+            coeff_mod=coeff_mod,
+            grading_mod=grading_mod,
+            lazy_augs=True,
+            lazy_bilin=True
+        )
+        self.filtration_levels = filtration_levels
+        self.augmentations = None
+        self.n_augs = None
+        self.bilin_polys = None
+        self.lazy_augs = lazy_augs
+        self.lazy_bilin = lazy_bilin
+        if lazy_augs and not lazy_bilin:
+            raise ValueError("DGA cannot autocompute bilinearized polys without autocomputing augmentations")
+        if not lazy_augs:
+            self.set_augmentations()
+            if not lazy_bilin:
+                self.set_all_bilin()
+
+    def _set_max_filtration_level(self):
+        self.max_filtration_level = max(self.filtration_levels.values())
+
+    @utils.log_start_stop
+    def set_augmentations(self):
+        f_level = 1
+        preset_subs = [dict()]
+        while f_level < self.max_filtration_level and len(preset_subs) > 0:
+            # Build DGA associated to current filtration level
+            symbols = [k for k, v in self.filtration_levels.items() if v <= f_level]
+            gradings = {k: v for k, v in self.gradings if k in symbols}
+            differentials = {k: v for k, v in self.differentials if k in symbols}
+            f_level_dga = DGA(
+                gradings=gradings,
+                differentials=differentials,
+                coeff_mod=self.coeff_mod,
+                lazy_augs=True,
+                lazy_bilin=True
+            )
+            # Compute augmentations for the filtration level by extending those from the previous level
+            # Each aug for this filtration level must extend those from previous levels
+            new_subs = []
+            for ps in preset_subs:
+                f_level_dga.set_augmentations(preset_subs_dict=ps)
+                new_subs += f_level_dga.augmentations
+            preset_subs = new_subs
+        self.augmentations = preset_subs
+        self.n_augs = len(self.augmentations)
+        LOG.info(f"Found {self.n_augs} augmentations of MFDGA")
+        self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]

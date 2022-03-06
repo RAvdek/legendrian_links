@@ -83,7 +83,7 @@ class RSFTGenerator(object):
             if not isinstance(chord, Chord):
                 raise ValueError("Trying to create WordOfChord object not from a list of chords")
         self.word = word
-        self.length = len(word)
+        self.filtration_level = len(word)
         graded_by_valid_or_except(graded_by)
         self.graded_by = graded_by
         self.capping_paths = capping_paths
