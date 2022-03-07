@@ -546,6 +546,7 @@ class PlatDiagram(object):
             if i % 2 == 0:
                 new_front_crossings += [j + n*i for j in right_triangle]
 
+        LOG.info(f"Front crossings after applying {n}-copy: {new_front_crossings}")
         return new_front_crossings
 
     def get_line_segment_array(self):

@@ -330,7 +330,8 @@ class ChainComplex(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
+    def __init__(self, gradings, differentials, filtration_levels=None,
+                 coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,
@@ -433,7 +434,7 @@ class DGA(DGBase):
         raise NotImplementedError()
 
     @utils.log_start_stop
-    def set_augmentations(self, preset_subs_dict=dict()):
+    def set_augmentations(self, filtered=False):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
@@ -445,24 +446,52 @@ class DGA(DGBase):
             symbols_to_comm_symbols = {g: sympy.Symbol(str(g), commutative=True) for g in zero_graded_symbols}
             comm_symbols = list(symbols_to_comm_symbols.values())
             # Only need to mod out by differentials of degree 1 elements
-            d_expressions = [v.expression for k,v in self.differentials.items() if self.gradings[k] == 1]
+            d_expressions = {k: v.expression for k,v in self.differentials.items() if self.gradings[k] == 1}
             LOG.info(f"Differentials required to compute augs: {len(d_expressions)}")
             # Set all non-zero graded elements to zero.
             zero_substitutions = {g: 0 for g in self.symbols if self.gradings[g] != 0}
             # Make polynomials in commutative variables of the deg=0 generators.
             # This is required to apply zero_set which only works with commuting variables!
-            polys = []
             LOG.info(f"Eliminating degree-non-zero terms from polys")
-            for exp in d_expressions:
-                polys.append(sympy.sympify(exp).subs(zero_substitutions))
+            polys = {
+                k: sympy.sympify(v).subs(zero_substitutions)
+                for k, v in d_expressions.items()
+            }
             LOG.info(f"Replacing non-commutative symbols with commutative")
-            polys = [p.subs(symbols_to_comm_symbols) for p in polys]
-            polys = utils.unique_elements(polys)
-            if 0 in polys:
-                polys.remove(0)
-            LOG.info(f"Polynomials required to compute augs after simplification: {len(polys)}")
-            comm_augmentations = polynomials.zero_set(
-                polys=polys, symbols=comm_symbols, modulus=self.coeff_mod, subs_dict=preset_subs_dict)
+            polys = {
+                k: v.subs(symbols_to_comm_symbols)
+                for k, v in polys.items()
+            }
+            LOG.info(f"Polynomials required to compute augs after simplification: {len(polys.keys())}")
+            if filtered:
+                # make polys into lists of lists using the filtrations of the comm_symbols
+                max_f = max([self.filtration_levels[g] for g in zero_graded_symbols])
+                current_f = 1
+                all_polys = []
+                all_comm_symbols = []
+                while current_f <= max_f:
+                    f_comm_symbols = [
+                        v for k, v in symbols_to_comm_symbols.items() if self.filtration_levels[k] == current_f
+                    ]
+                    LOG.info(f"{len(f_comm_symbols)} symbols with filtration level {current_f}")
+                    f_polys = [
+                        v for k, v in polys.items() if self.filtration_levels[k] == current_f
+                    ]
+                    LOG.info(f"{len(f_polys)} polys with filtration level {current_f}")
+                    all_comm_symbols.append(f_comm_symbols)
+                    all_polys.append(utils.unique_elements(f_polys))
+                    if 0 in f_polys:
+                        f_polys.remove(0)
+                    current_f += 1
+                comm_augmentations = polynomials.filtered_zero_set(
+                    polys=all_polys, symbols=all_comm_symbols, modulus=self.coeff_mod)
+            else:
+                all_comm_symbols = comm_symbols
+                all_polys = utils.unique_elements(polys.values())
+                if 0 in all_polys:
+                    all_polys.remove(0)
+                comm_augmentations = polynomials.zero_set(
+                    polys=all_polys, symbols=all_comm_symbols, modulus=self.coeff_mod)
             # comm_augs will be a list of dicts whose keys are the commutative symbols.
             # We need to switch them back!
             comm_symbols_to_symbols = {v:k for k, v in symbols_to_comm_symbols.items()}
