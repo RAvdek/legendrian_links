@@ -1143,7 +1143,7 @@ class PlatDiagram(object):
         }
         gradings = {g.symbol: g.grading for g in self.rsft_generators}
         filtration_levels = {g.symbol: g.filtration_level for g in self.rsft_generators}
-        self.rsft_dga = algebra.MFDGA(
+        self.rsft_dga = algebra.DGA(
             gradings=gradings,
             differentials=rsft_del,
             filtration_levels=filtration_levels,

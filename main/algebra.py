@@ -217,7 +217,7 @@ class LinearMap(object):
 class DGBase(object):
     """Base class for differential graded objects"""
 
-    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0):
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         """
         :param symbols: Dictionary mapping generator -> grading.
         :param differentials: Dictionary mapping generator -> polynomial.
@@ -229,8 +229,10 @@ class DGBase(object):
         self.differentials = differentials
         self.coeff_mod = coeff_mod
         self.grading_mod = grading_mod
+        self.filtration_levels = filtration_levels
         self._verify_init_args()
         self._correct_gradings()
+        self._correct_filtration_levels()
 
     def reduced(self, ceoff_mod, grading_mod):
         if self.coeff_mod % ceoff_mod != 0:
@@ -243,6 +245,13 @@ class DGBase(object):
             coeff_mod=ceoff_mod,
             grading_mod=grading_mod
         )
+
+    def _correct_filtration_levels(self):
+        if self.filtration_levels is None:
+            self.filtration_levels = {k: 1 for k in self.gradings.keys()}
+            self.max_filtration_level = 1
+            return
+        self.max_filtration_level = max(self.filtration_levels.values())
 
     def _verify_init_args(self):
         if self.coeff_mod != 0:
@@ -262,10 +271,11 @@ class DGBase(object):
 
 class ChainComplex(DGBase):
 
-    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0):
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         super(ChainComplex, self).__init__(
             gradings=gradings,
             differentials=differentials,
+            filtration_levels=filtration_levels,
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
@@ -320,10 +330,11 @@ class ChainComplex(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,
+            filtration_levels=filtration_levels,
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
@@ -462,33 +473,3 @@ class DGA(DGBase):
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
         self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
-
-
-class MFDGA(DGA):
-
-    def __init__(self, gradings, differentials, filtration_levels,
-                 coeff_mod=0, grading_mod=0, lazy_augs=False, lazy_bilin=False):
-        super(MFDGA, self).__init__(
-            gradings=gradings,
-            differentials=differentials,
-            coeff_mod=coeff_mod,
-            grading_mod=grading_mod,
-            lazy_augs=True,
-            lazy_bilin=True
-        )
-        self.filtration_levels = filtration_levels
-        self.augmentations = None
-        self.n_augs = None
-        self.bilin_polys = None
-        self.lazy_augs = lazy_augs
-        self.lazy_bilin = lazy_bilin
-        self._set_max_filtration_level()
-        if lazy_augs and not lazy_bilin:
-            raise ValueError("DGA cannot autocompute bilinearized polys without autocomputing augmentations")
-        if not lazy_augs:
-            self.set_augmentations()
-            if not lazy_bilin:
-                self.set_all_bilin()
-
-    def _set_max_filtration_level(self):
-        self.max_filtration_level = max(self.filtration_levels.values())
