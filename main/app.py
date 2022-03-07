@@ -45,9 +45,9 @@ def get_template_context(pd):
         }
         for chord in pd.chords]
     dgas = []
-    if pd.auto_lch:
+    if not pd.lazy_lch:
         dgas.append(get_dga_context(pd.lch_dga, name="LCH"))
-    if pd.auto_rsft:
+    if not pd.lazy_rsft:
         dgas.append(get_dga_context(pd.rsft_dga, name="RSFT"))
     template_context = {
         'front_crossings': ','.join([str(c) for c in pd.front_crossings]),
@@ -132,16 +132,16 @@ def home():
             crossings = []
         else:
             crossings = [int(x) for x in crossings.split(",")]
-        auto_lch = True
-        auto_rsft = False
+        lazy_lch = True
+        lazy_rsft = False
         auto_dga = request.args.get('auto_dga')
         if auto_dga is not None:
             auto_dgas = auto_dga.lower().split(',')
-            if 'rsft' in auto_dgas:
-                auto_lch = False
-                auto_rsft = True
             if 'lch' in auto_dgas:
-                auto_lch = True
+                lazy_lch = False
+                lazy_rsft = True
+            if 'rsft' in auto_dgas:
+                lazy_rsft = False
         n_copy = request.args.get('n_copy')
         if n_copy is not None:
             n_copy = int(n_copy)
@@ -151,14 +151,14 @@ def home():
             n_strands=n_strands,
             front_crossings=crossings,
             n_copy=n_copy,
-            auto_lch=auto_lch,
-            auto_rsft=auto_rsft
+            lazy_lch=lazy_lch,
+            lazy_rsft=lazy_rsft
         )
     else:
         data = LINKS[DEFAULT_LINK_KEY].copy()
         data.pop('comment')
-        data['auto_lch'] = True
-        data['auto_rsft'] = False
+        data['lazy_lch'] = True
+        data['lazy_rsft'] = False
         pd = ll.PlatDiagram(**data)
     template_context = get_template_context(pd=pd)
     context = INDEX_TEMPLATE.render(**template_context)

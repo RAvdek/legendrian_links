@@ -487,12 +487,12 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, auto_lch=True, auto_rsft=True):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, lazy_lch=True, lazy_rsft=True):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
         self.n_copy = n_copy
-        self.auto_lch = auto_lch
-        self.auto_rsft = auto_rsft
+        self.lazy_lch = lazy_lch
+        self.lazy_rsft = lazy_rsft
 
         if n_copy > 1:
             self.front_crossings = self.copy_front_crossings(n_copy)
@@ -511,11 +511,11 @@ class PlatDiagram(object):
         self._set_disk_graph()
         self._set_disks()
         self._set_disk_corners()
-        self.auto_lch = auto_lch
-        if auto_lch:
+        self.lazy_lch = lazy_lch
+        if not lazy_lch:
             self.set_lch()
-        self.auto_rsft = auto_rsft
-        if auto_rsft:
+        self.lazy_rsft = lazy_rsft
+        if not lazy_rsft:
             self.set_rsft()
 
     def copy_front_crossings(self, n):
@@ -677,16 +677,16 @@ class PlatDiagram(object):
             output &= (word[-1], word[0]) in self.composable_pairs
             return output
 
-    def set_lch(self):
+    def set_lch(self, lazy_augs=False, lazy_bilin=False):
         self._set_lch_graded_by()
         self._set_lch_generators()
-        self._set_lch_dga()
+        self._set_lch_dga(lazy_augs=lazy_augs, lazy_bilin=lazy_bilin)
 
-    def set_rsft(self):
+    def set_rsft(self, lazy_augs=False, lazy_bilin=False):
         self._set_composable_admissible_words()
         self._set_rsft_graded_by()
         self._set_rsft_generators()
-        self._set_rsft_dga()
+        self._set_rsft_dga(lazy_augs=lazy_augs, lazy_bilin=lazy_bilin)
 
     def _set_line_segments(self):
         lines = []
@@ -921,7 +921,7 @@ class PlatDiagram(object):
         self.lch_generators = lch_generators
 
     @utils.log_start_stop
-    def _set_lch_dga(self):
+    def _set_lch_dga(self, lazy_augs=False, lazy_bilin=False):
         lch_disks = [d for d in self.disks if d.is_lch()]
         lch_del = {g: 0 for g in self.lch_generators}
         for d in lch_disks:
@@ -943,7 +943,9 @@ class PlatDiagram(object):
             for g in lch_del.keys()
         }
         gradings = {g.symbol: g.grading for g in self.lch_generators}
-        self.lch_dga = algebra.DGA(gradings=gradings, differentials=lch_del, coeff_mod=2)
+        self.lch_dga = algebra.DGA(
+            gradings=gradings, differentials=lch_del, coeff_mod=2, lazy_augs=lazy_augs, lazy_bilin=lazy_bilin
+        )
 
     @utils.log_start_stop
     def _set_composable_admissible_words(self):
@@ -984,7 +986,7 @@ class PlatDiagram(object):
         self.rsft_generators = cyclic_composable_admissible_words
 
     @utils.log_start_stop
-    def _set_rsft_dga(self):
+    def _set_rsft_dga(self, lazy_augs=False, lazy_bilin=False):
         disks = self.disks
         rsft_del = {w: 0 for w in self.rsft_generators}
 
@@ -1140,4 +1142,12 @@ class PlatDiagram(object):
             for g in rsft_del.keys()
         }
         gradings = {g.symbol: g.grading for g in self.rsft_generators}
-        self.rsft_dga = algebra.DGA(gradings=gradings, differentials=rsft_del, coeff_mod=2)
+        filtration_levels = {g.symbol: g.filtration_level for g in self.rsft_generators}
+        self.rsft_dga = algebra.MFDGA(
+            gradings=gradings,
+            differentials=rsft_del,
+            filtration_levels=filtration_levels,
+            coeff_mod=2,
+            lazy_augs=lazy_augs,
+            lazy_bilin=lazy_bilin
+        )

@@ -482,6 +482,7 @@ class MFDGA(DGA):
         self.bilin_polys = None
         self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
+        self._set_max_filtration_level()
         if lazy_augs and not lazy_bilin:
             raise ValueError("DGA cannot autocompute bilinearized polys without autocomputing augmentations")
         if not lazy_augs:
@@ -491,31 +492,3 @@ class MFDGA(DGA):
 
     def _set_max_filtration_level(self):
         self.max_filtration_level = max(self.filtration_levels.values())
-
-    @utils.log_start_stop
-    def set_augmentations(self):
-        f_level = 1
-        preset_subs = [dict()]
-        while f_level < self.max_filtration_level and len(preset_subs) > 0:
-            # Build DGA associated to current filtration level
-            symbols = [k for k, v in self.filtration_levels.items() if v <= f_level]
-            gradings = {k: v for k, v in self.gradings if k in symbols}
-            differentials = {k: v for k, v in self.differentials if k in symbols}
-            f_level_dga = DGA(
-                gradings=gradings,
-                differentials=differentials,
-                coeff_mod=self.coeff_mod,
-                lazy_augs=True,
-                lazy_bilin=True
-            )
-            # Compute augmentations for the filtration level by extending those from the previous level
-            # Each aug for this filtration level must extend those from previous levels
-            new_subs = []
-            for ps in preset_subs:
-                f_level_dga.set_augmentations(preset_subs_dict=ps)
-                new_subs += f_level_dga.augmentations
-            preset_subs = new_subs
-        self.augmentations = preset_subs
-        self.n_augs = len(self.augmentations)
-        LOG.info(f"Found {self.n_augs} augmentations of MFDGA")
-        self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]

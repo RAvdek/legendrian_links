@@ -204,33 +204,6 @@ class SolutionSearchNode(object):
         if modified:
             self._update_subs_and_polys()
 
-    """
-    @utils.log_start_stop
-    def _update_subs_and_polys(self):
-        n_unset_vars = len(self.get_unset_vars())
-        if n_unset_vars == 0:
-            self.TERMINAL = True
-            return
-        n_polys = len(self.polys)
-        if n_polys == 0:
-            return
-        LOG.info(f"Update substitutions in SolutionSearchNode with {n_unset_vars} unset vars & {n_polys} polys")
-        self._apply_subs()
-        self._check_for_const_polys()
-        if self.UNSOLVEABLE:
-            return
-        self._simplify_polys()
-        self._check_for_const_polys()
-        modified = False
-        if not self.UNSOLVEABLE:
-            modified = self._check_for_linear_polys()
-        if len(self.get_unset_vars()) == 0:
-            self.TERMINAL = True
-            return
-        if modified:
-            self._update_subs_and_polys()
-    """
-
     def _apply_subs(self, specific_subs=dict()):
         """Update self.polys by applying substitutions in self.subs_dict or specific_subs
 
@@ -275,7 +248,6 @@ class SolutionSearchNode(object):
             LOG.info(f"Failed to compute Groebner basis after {run_time}s")
         return modified
 
-    @utils.log_start_stop
     def _check_for_const_polys(self):
         """Check for appearances of constant polynomials.
         If zero, throw them out.
@@ -294,7 +266,6 @@ class SolutionSearchNode(object):
                 modified = True
         return modified
 
-    @utils.log_start_stop
     def _check_for_linear_polys(self):
         """Check for appearances of linear terms in self.polys.
         If any are found, apply manual substitutions.
