@@ -434,8 +434,10 @@ class DGA(DGBase):
         raise NotImplementedError()
 
     @utils.log_start_stop
-    def set_augmentations(self, filtered=False):
+    def set_augmentations(self, filtered=False, chunky=False):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
+        if filtered and chunky:
+            raise ValueError("Have to choose either filtered or chunky, not both")
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
         zero_graded_symbols = [g for g in self.symbols if self.gradings[g] == 0]
@@ -490,8 +492,12 @@ class DGA(DGBase):
                 all_polys = utils.unique_elements(polys.values())
                 if 0 in all_polys:
                     all_polys.remove(0)
-                comm_augmentations = polynomials.zero_set(
-                    polys=all_polys, symbols=all_comm_symbols, modulus=self.coeff_mod)
+                if chunky:
+                    comm_augmentations = polynomials.chunky_zero_set(
+                        polys=all_polys, symbols=all_comm_symbols, modulus=self.coeff_mod)
+                else:
+                    comm_augmentations = polynomials.zero_set(
+                        polys=all_polys, symbols=all_comm_symbols, modulus=self.coeff_mod)
             # comm_augs will be a list of dicts whose keys are the commutative symbols.
             # We need to switch them back!
             comm_symbols_to_symbols = {v:k for k, v in symbols_to_comm_symbols.items()}

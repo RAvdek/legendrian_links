@@ -59,9 +59,10 @@ def unique_elements(array):
     :param array: list
     :return: list
     """
-    output = set()
+    output = list()
     for x in array:
-        output.add(x)
+        if x not in output:
+            output.append(x)
     return list(output)
 
 

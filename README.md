@@ -24,6 +24,7 @@ A URL should appear which you can access from your web browser. Parameters `n_st
 
 ## Features
 
+- During set spawn, we take a cartesian product over all of the sunset variables. We should avoid this so we don't spawn billions of nodes.
 - Application is maintaining some variables between requests.
 - Currently zero_sets are just too big to process. We could try splitting collections of equations up in some kind of intelligent way. Current issue is that on first iterations, there are no linear or affine expressions so we cannot manually simplify.
 - Setup for `_set_augmentations` takes a long time. We should think about ways of simplifying.
