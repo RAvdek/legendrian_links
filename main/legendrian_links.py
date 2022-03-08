@@ -487,7 +487,7 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, lazy_disks=True, lazy_lch=True, lazy_rsft=True):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, lazy_disks=False, lazy_lch=True, lazy_rsft=True):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
         self.n_copy = n_copy

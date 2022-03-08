@@ -2,7 +2,9 @@
 
 An interactive application for analyzing Legendrian links. Or it will be some day, maybe.
 
-Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra. We also want to make analysis of knots accessible through a web application (with minimal dependencies) so that users don't need to know how to code.
+Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
+
+The program computes augmentations of LCH algebras as well as for a version of Legendrian RSFT (which is not on the arXiv yet). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
 
 # Installation
 
@@ -18,16 +20,17 @@ $ python app.py
 
 # Web interface
 
-When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3`, giving a [polyfillable link](https://arxiv.org/abs/1307.7998):
+When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&auto_dgas=rsft`, giving a [polyfillable link](https://arxiv.org/abs/1307.7998):
 
 ![image info](./main/static/screenshot.png)
 
+Only use the web interface to compute augmentations for links with small numbers (say, < 30) of crossings. To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
+
 # Python interface & batch processing
 
-Only use the web interface to compute augmentations for links with small numbers (say, < 30) of crossings. Computing augmentations of DGAs with large numbers of generators can take hours or be impossible due to memory constraints. We use batch processing to deal with these cases.
+Computing augmentations of DGAs with large numbers of generators can take hours or be impossible due to memory constraints. Even computing gradings for DGAs can be time consuming. We use batch processing to deal with these cases. For an example, suppose we want to compute augmentations of the RSFT algebra of the 2-copy of the [famous slice knot](https://arxiv.org/pdf/1301.3767.pdf) `m(9_46)`.
 
-Here is an example. Suppose we want to compute augmentations of the RSFT algebra of the 2-copy of `m(9_46)`. Run the following code from inside the `main/` folder to setup the `PlatDiagram` object:
-
+Run the following code from inside the `main/` folder to setup the `PlatDiagram` object:
 ```
 $ python
 >>> import legendrian_links as ll
@@ -51,7 +54,7 @@ The `lazy...` options prevent the program from jumping into too many heavy calcu
 ...
 {'symbol': {71,32}, 'freq': 2, 'n_cum_polys': 304, 'poly_to_sym_ratio': 1.6888888888888889}
 ```
-This tells us that in order to enumerate all augmentations of the DGA, we need to find the common zero set of 304 polynomials in 180 variables over Z/2Z. Batch processing allows us to solve a subset of the polynomials first, and then iteratively add more polynomials. Looking at 'poly_to_sym_ratio' in the logs, if we try work with the first 7 polynomials, we will have a very sparse problem (with more variables then polynomials). If we work with the first 251 polynomials, the problem will be less sparse but this might be too much data to process at once. We'll go with 100:
+This tells us that in order to enumerate all augmentations of the DGA, we need to find the common zero set of 304 polynomials in 180 variables over Z/2Z. Batch processing allows us to solve a subset of the polynomials first, and then iteratively add more polynomials. Looking at 'poly_to_sym_ratio' in the logs, if we try work with the first 7 polynomials, we will have a very sparse problem (with more variables than polynomials). If we work with the first 251 polynomials, the problem will be less sparse but this might be too much data to process at once. We'll go with 100:
 ```
 >>> pd.rsft_dga.set_augmentations(batch_size=100)
 2022-03-08 10:15:20,450|utils|INFO|Starting execution set_augmentations
@@ -69,16 +72,16 @@ After about 70 minutes we see that the RSFT DGA has no augmentations! This compu
 
 - Some threads used for Groebner appear to never die.
 - During set spawn, we take a cartesian product over all of the sunset variables. We should avoid this so we don't spawn billions of nodes. Currently implemented but needs to be undoable from `algebra.py` or `polynomials.py`.
-- Application is maintaining some variables between requests.
+- Way behind on testing...
+- Application may be maintaining some variables between requests?
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
 - Copy knot tables. Have to remember how to translate Sivek front crossing notation to mine.
 - UI: Ordering of generators is annoyingly out of place. Should also count numbers of augs.
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
-- Should be able to use Groebner bases to tell if the commutative version of a DGA is trivial with Z/2 ceoffs. Implement in dga.py.
-- Make tables nicer using some JS library. Big tables can be condensed.
+- Make tables nicer using some JS library. Big tables can be condensed. It would also be nice to sort data.
 - Introduce t coordinate in differentials. (This is not so important for augmentations where we can use t=1 for Z/2Z coeffs).
-- Ability to flip orientations of link components.
+- Ability to flip orientations of link components. Currently upper-left corner always points right.
 - Ability to reverse orientations on link components.
 - Orientations: Process disks into differentials for LCH with Z coefficients.
 - Carry out orientation processing for RSFT differentials.

@@ -385,42 +385,22 @@ class DGA(DGBase):
         # How frequently to log?
         log_frequency = 20
         bilin_counter = 0
-        bilin_diff_storage = list()
         for i in range(self.n_augs):
             for j in range(self.n_augs):
                 aug_1 = self.augmentations[i]
                 aug_2 = self.augmentations[j]
                 bilin_diff = self.get_bilin_differential(aug_1, aug_2)
-                storage_matches = [
-                    i for i in range(len(bilin_diff_storage)) if bilin_diff_storage[i]["diff"] == bilin_diff
-                ]
-                if len(storage_matches) > 0:
-                    i = storage_matches[0]
-                    poincare_poly = bilin_diff_storage[i]["poincare_poly"]
-                    bilin_diff_storage[i]["augs"].append([i, j])
-                else:
-                    cx = ChainComplex(
-                        gradings=self.gradings,
-                        differentials=bilin_diff,
-                        grading_mod=self.grading_mod,
-                        coeff_mod=self.coeff_mod
-                    )
-                    poincare_poly = cx.poincare_poly
-                    bilin_diff_storage.append(
-                        {
-                            "diff": bilin_diff,
-                            "poincare_poly": poincare_poly,
-                            "augs": [[i, j]]
-                        }
-                    )
+                cx = ChainComplex(
+                    gradings=self.gradings,
+                    differentials=bilin_diff,
+                    grading_mod=self.grading_mod,
+                    coeff_mod=self.coeff_mod
+                )
+                poincare_poly = cx.poincare_poly
                 self.bilin_polys[i][j] = poincare_poly
                 bilin_counter += 1
                 if bilin_counter % log_frequency == 0:
                     LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
-                    diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
-                    LOG.info(f"Frequency of repetition in bilin homologies so far: {diff_frequency}")
-        diff_frequency = dict(Counter([len(d["augs"]) for d in bilin_diff_storage]))
-        LOG.info(f"Frequency of repetition in bilin homologies: {diff_frequency}")
 
     def are_homotopy_equivalent(self, aug_1, aug_2):
         """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field
@@ -476,11 +456,15 @@ class DGA(DGBase):
         LOG.info(f"Polynomials required to compute augs after simplification: {len(aug_polys)}")
         self.aug_polys = aug_polys
         # Create table to help inform batch size
+        # TODO: This is replicated in batch_zero_set. Should make into a function
         poly_to_symbols = {p: polynomials.poly_symbols(p) for p in aug_polys}
         symbol_freq = Counter()
         for symbol_set in poly_to_symbols.values():
             symbol_freq.update(list(symbol_set))
         symbol_freq = dict(symbol_freq)
+        for sym in self.aug_comm_symbols_to_symbols.keys():
+            if sym not in symbol_freq.keys():
+                symbol_freq[sym] = 0
         symbol_table = [
             {
                 "symbol": k,

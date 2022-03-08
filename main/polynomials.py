@@ -47,20 +47,18 @@ def zero_set(
         )
         for subs_dict in subs_dicts
     ]
-    nodes = roots
-    spawned_nodes = []
+    unspawned_nodes = roots
     solution_nodes = []
     loop_counter = 0
     while True:
-        LOG.info(f"{loop_counter}th loop of zero_set search: {len(nodes)} nodes, "
-                 f"{len(spawned_nodes)} spawned nodes, "
+        LOG.info(f"{loop_counter}th loop of zero_set search: "
+                 f"{len(unspawned_nodes)} unspawned nodes, "
                  f"{len(solution_nodes)} solution nodes")
         loop_counter += 1
-        unspawned_nodes = [node for node in nodes if node not in spawned_nodes]
         if len(unspawned_nodes) == 0:
             break
-        for node in unspawned_nodes:
-            spawned_nodes.append(node)
+        else:
+            node = unspawned_nodes.pop(0)
             if node.has_solution():
                 solution_nodes.append(node)
                 # Terminate as early as possible if only checking existence
@@ -68,8 +66,7 @@ def zero_set(
                     return True
             else:
                 # Search depth first by spawning at the first unspawned node
-                nodes = node.get_spawn() + nodes
-                break
+                unspawned_nodes = node.get_spawn() + unspawned_nodes
     if existence_only:
         return len(solution_nodes) > 0
     return [node.subs_dict for node in solution_nodes]
@@ -230,12 +227,13 @@ class SolutionSearchNode(object):
         self.allow_unset = allow_unset
         self.TERMINAL = False
         self.UNSOLVEABLE = False
+        self.ff_elements = finite_field_elements(self.modulus)
         self.id = utils.tiny_id()
-        self._setup_subs()
         if (len(self.polys) > 0) and (len(self.get_unset_vars()) > 0):
+            self._setup_subs()
             self._apply_subs()
             self._update_subs_and_polys()
-        self._cleanup_subs()
+            self._cleanup_subs()
         self._check_unset_vars()
 
     def get_unset_vars(self):
@@ -316,7 +314,7 @@ class SolutionSearchNode(object):
         if self.UNSOLVEABLE:
             self.TERMINAL = True
             return
-        if len(self.get_unset_vars()) == 0:
+        if n_unset_vars == 0:
             self.TERMINAL = True
             return
         modified = self._simplify_polys()
@@ -362,12 +360,14 @@ class SolutionSearchNode(object):
         del ideal_basis_thread
         if not thread_timeout:
             grob_polys = new_basis["polys"]
+            n_polys = len(self.polys)
+            n_grob_polys = len(grob_polys)
             if set(self.polys) != set(grob_polys):
                 LOG.info(f"SolutionSearchNode={self.id}: "
-                         f"Groebner simplified {len(self.polys)} polys to {len(grob_polys)}")
+                         f"Groebner simplified {n_polys} polys to {n_grob_polys}")
                 # How is it possible that I see Groebner making the polynomial sets larger!?
                 # I've witnessed this and want to always shrink the number of generators.
-                if len(grob_polys) <= len(self.polys):
+                if n_grob_polys <= n_polys:
                     self.polys = grob_polys
                     modified = True
         else:
@@ -383,15 +383,15 @@ class SolutionSearchNode(object):
         :return: Bool... where subs or polynomials modified?
         """
         modified = False
-        if 0 in self.polys:
-            self.polys.remove(0)
-            modified = True
         # should make finite field elements a node attribute to save time repeating this...
-        for c in [c for c in finite_field_elements(modulus=self.modulus) if c != 0]:
+        for c in self.ff_elements:
             if c in self.polys:
-                self.TERMINAL = True
-                self.UNSOLVEABLE = True
                 modified = True
+                if c == 0:
+                    self.polys.remove(0)
+                else:
+                    self.TERMINAL = True
+                    self.UNSOLVEABLE = True
         return modified
 
     def _check_for_linear_polys(self):
@@ -401,7 +401,7 @@ class SolutionSearchNode(object):
         :return: Bool... where subs of polynomials modified?
         """
         modified = False
-        for c in finite_field_elements(modulus=self.modulus):
+        for c in self.ff_elements:
             for g in self.get_unset_vars():
                 if g - c in self.polys:
                     self.polys.remove(g - c)
