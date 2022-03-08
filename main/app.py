@@ -36,7 +36,6 @@ KNOT_ORIENTATIONS_TO_ARROW = {
 
 
 def get_template_context(pd):
-    disk_corners = pd.disk_corners
     chords = [
         {
             "string": str(chord),
@@ -53,8 +52,6 @@ def get_template_context(pd):
         'front_crossings': ','.join([str(c) for c in pd.front_crossings]),
         'svg_context': get_diagram_context(pd),
         'chords': chords,
-        'n_disks': len(disk_corners),
-        'disk_corners': disk_corners,
         'dgas': dgas
     }
     return template_context
@@ -66,7 +63,7 @@ def get_diagram_context(pd, increment=50, pad=10):
         knots[k]["label"] = k
         knots[k]["rgb"] = KNOT_COLORS[k % len(KNOT_COLORS)]
     n_strands = pd.n_strands
-    n_segments = len(pd.plat_segments)
+    n_segments = pd.max_x_right
     height = increment * n_strands + pad
     width = (increment * n_segments) + pad + increment
     line_segments = pd.get_line_segment_array()
@@ -133,13 +130,12 @@ def home():
         else:
             crossings = [int(x) for x in crossings.split(",")]
         lazy_lch = True
-        lazy_rsft = False
-        auto_dga = request.args.get('auto_dga')
+        lazy_rsft = True
+        auto_dga = request.args.get('auto_dgas')
         if auto_dga is not None:
             auto_dgas = auto_dga.lower().split(',')
             if 'lch' in auto_dgas:
                 lazy_lch = False
-                lazy_rsft = True
             if 'rsft' in auto_dgas:
                 lazy_rsft = False
         n_copy = request.args.get('n_copy')
@@ -147,12 +143,17 @@ def home():
             n_copy = int(n_copy)
         else:
             n_copy = 1
+        lazy_disks = False
+        lazy_disks_flag = request.args.get('lazy_disks')
+        if lazy_disks_flag is not None:
+            lazy_disks = lazy_disks_flag.lower() == 'true'
         pd = ll.PlatDiagram(
             n_strands=n_strands,
             front_crossings=crossings,
             n_copy=n_copy,
+            lazy_disks=lazy_disks,
             lazy_lch=lazy_lch,
-            lazy_rsft=lazy_rsft
+            lazy_rsft=lazy_rsft,
         )
     else:
         data = LINKS[DEFAULT_LINK_KEY].copy()

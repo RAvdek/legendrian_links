@@ -487,12 +487,18 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, lazy_lch=True, lazy_rsft=True):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, lazy_disks=True, lazy_lch=True, lazy_rsft=True):
         self.n_strands = n_strands
         self.front_crossings = front_crossings
         self.n_copy = n_copy
+        self.lazy_disks = lazy_disks
         self.lazy_lch = lazy_lch
         self.lazy_rsft = lazy_rsft
+        LOG.info(f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, "
+                 f"n_copy={n_copy}, lazy_disks={lazy_disks}, lazy_lch={lazy_lch}, lazy_rsft={lazy_rsft})")
+
+        if lazy_disks and ((not lazy_lch) or (not lazy_rsft)):
+            raise ValueError("Cannot autocompute DGAs with lazy_disks=True")
 
         if n_copy > 1:
             self.front_crossings = self.copy_front_crossings(n_copy)
@@ -501,20 +507,16 @@ class PlatDiagram(object):
 
         self._set_line_segments()
         self.max_x_left = max([ls.x_left for ls in self.line_segments])
+        self.max_x_right = max([ls.x_right for ls in self.line_segments])
         self._label_line_segments()
         # wait to set crossings until the line segments have been labeled
         self._set_chords()
         self._set_knots()
-        self._set_composable_pairs()
-        self._set_capping_paths()
-        self._set_plat_segments()
-        self._set_disk_graph()
-        self._set_disks()
-        self._set_disk_corners()
-        self.lazy_lch = lazy_lch
+        if lazy_disks:
+            return
+        self.set_disks_and_gradings()
         if not lazy_lch:
             self.set_lch()
-        self.lazy_rsft = lazy_rsft
         if not lazy_rsft:
             self.set_rsft()
 
@@ -677,6 +679,14 @@ class PlatDiagram(object):
                 return output
             output &= (word[-1], word[0]) in self.composable_pairs
             return output
+
+    def set_disks_and_gradings(self):
+        self._set_composable_pairs()
+        self._set_capping_paths()
+        self._set_plat_segments()
+        self._set_disk_graph()
+        self._set_disks()
+        self._set_disk_corners()
 
     def set_lch(self, lazy_augs=False, lazy_bilin=False):
         self._set_lch_graded_by()

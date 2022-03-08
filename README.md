@@ -32,10 +32,10 @@ Here is an example. Suppose we want to compute augmentations of the RSFT algebra
 $ python
 >>> import legendrian_links as ll
 >>> front = [1,2,3,4,2,0,1,4,1,2,0,3,1,3,2,4,1,3]
->>> pd = ll.PlatDiagram(n_strands=6, front_crossings=front, n_copy=2, lazy_lch=True, lazy_rsft=True)
+>>> pd = ll.PlatDiagram(n_strands=6, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=True, lazy_rsft=True)
 >>> pd.set_rsft(lazy_augs=True, lazy_bilin=True)
 ```
-The `lazy...` options prevent the program from jumping into heavy calculations. A bunch of data will be logged to the command line:
+The `lazy...` options prevent the program from jumping into too many heavy calculations. A bunch of data will be logged to the command line:
 ```
 2022-03-08 10:10:00,488|utils|INFO|DGA has 180 generators with 0 grading
 2022-03-08 10:10:00,492|utils|INFO|Differentials required to compute augs: 304
@@ -61,7 +61,7 @@ This tells us that in order to enumerate all augmentations of the DGA, we need t
 2022-03-08 11:25:07,584|utils|INFO|Ending execution batch_zero_set
 2022-03-08 11:25:07,584|utils|INFO|Found 0 augmentations of DGA
 ```
-After about 70 minutes. We see that the RSFT DGA has no augmentations! This computation would have been impossible without batch processing due to memory constraints of my laptop.
+After about 70 minutes we see that the RSFT DGA has no augmentations! This computation would have been impossible without batch processing due to memory constraints of my laptop.
 
 # To do list
 
