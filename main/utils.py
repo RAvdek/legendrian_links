@@ -1,5 +1,7 @@
 import json
 import logging
+import random
+import string
 
 
 with open('links.json') as f:
@@ -31,6 +33,15 @@ def log_start_stop(func):
         LOG.info(f"Ending execution {func.__name__}")
         return result
     return timed
+
+
+def tiny_id(k=4):
+    """Generate an id string. Functional, but less safe than UUID. See https://stackoverflow.com/a/56398787.
+
+    :param k: length of the id
+    :return: str
+    """
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=k))
 
 
 # Methods for manipulating lists

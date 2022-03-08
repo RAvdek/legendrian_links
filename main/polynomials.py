@@ -111,63 +111,6 @@ def batch_zero_set(polys, symbols, modulus=2, groebner_timeout=GROEBNER_TIMEOUT_
     loop_counter = 0
     n_analyzed_symbols = 0
     while len(analyzed_polys) < len(polys) and len(subs_dicts) > 0:
-        """
-        new_polys = []
-        while len(new_polys) == 0:
-            # How many new variables will the addition of each polynomial introduce?
-            poly_to_new_var_counts = {
-                k: len(v.difference(analyzed_symbols))
-                for k, v in poly_to_symbols.items()
-                if k not in analyzed_polys
-            }
-            # Figure out the minimum number of new variables we need to introduce in order to analyze more polynomials
-            count = 0
-            while count not in poly_to_new_var_counts.values():
-                count += 1
-            count_polys = [k for k, v in poly_to_new_var_counts.items() if v == count]
-            # If we have to add new variables. Only add the least possible...
-            # Can update this to find the variable with most frequent occurrences
-            if count != 0:
-                # what symbols appear in the polynomials with minimum amounts of new vars
-                new_symbols = set()
-                for p in count_polys:
-                    new_symbols.update(poly_to_symbols[p])
-                new_symbols = [sym for sym in new_symbols if sym not in analyzed_symbols]
-                new_symbols_counts = {k: v for k, v in symbol_freq.items() if k in new_symbols}
-                # List of new symbols sorted by their frequency
-                new_symbols = sorted(new_symbols, key=lambda sym: new_symbols_counts[sym], reverse=True)
-                # Eliminate already analyzed symbols... Since count!=0 should be non-empty
-                n_new_symbols = max([len(new_symbols), chunk_size])
-                analyzed_symbols.update(set(new_symbols[:n_new_symbols]))
-            new_polys = [
-                k for k,v in poly_to_symbols.items()
-                if v.issubset(analyzed_symbols) and k not in analyzed_polys
-            ]
-        # ANOTHER ATTEMPT
-        poly_to_new_var_counts = {
-            k: len(v.difference(analyzed_symbols))
-            for k, v in poly_to_symbols.items()
-            if k not in analyzed_polys
-        }
-        if 0 in poly_to_new_var_counts.values():
-            new_polys = [k for k, v in poly_to_new_var_counts.items() if v == 0]
-        else:
-            # We want to add a chunk_size many variables at a time
-            # It seems that choosing 1 means many iterations,
-            # whereas choosing chunk_size too large means processing many variables
-            poly_to_new_var_counts_chunky = {
-                k: v for k, v in poly_to_new_var_counts.items()
-                if v <= chunk_size
-            }
-            new_polys = sorted(list(poly_to_new_var_counts_chunky.keys()), key=lambda k: poly_to_new_var_counts[k])
-            new_poly = new_polys[-1]
-            LOG.info(f"New poly: {new_poly}")
-            analyzed_symbols.update(poly_to_symbols[new_poly])
-            new_polys = [
-                k for k, v in poly_to_symbols.items()
-                if v.issubset(analyzed_symbols) and k not in analyzed_polys
-            ]
-        """
         # We want to add new variables so that the ratio of new_polys / new_vars is the highest
         # This pattern gives a hueristic
         unanalyzed_symbols = [x for x in symbols if x not in analyzed_symbols]
@@ -287,6 +230,7 @@ class SolutionSearchNode(object):
         self.allow_unset = allow_unset
         self.TERMINAL = False
         self.UNSOLVEABLE = False
+        self.id = utils.tiny_id()
         self._setup_subs()
         if (len(self.polys) > 0) and (len(self.get_unset_vars()) > 0):
             self._apply_subs()
@@ -356,7 +300,8 @@ class SolutionSearchNode(object):
         if n_polys == 0:
             return
         while not self.UNSOLVEABLE:
-            LOG.info(f"Update substitutions in SolutionSearchNode with {n_unset_vars} unset vars & {n_polys} polys")
+            LOG.info(f"SolutionSearchNode={self.id}: Update substitutions "
+                     f"with {n_unset_vars} unset vars & {n_polys} polys")
             # Keep trying to simplify using brute force substitutions
             start_unset_vars = len(self.get_unset_vars())
             self._check_for_linear_polys()
@@ -366,7 +311,8 @@ class SolutionSearchNode(object):
             # Break and try Groebner if there was no effect
             if start_unset_vars == n_unset_vars:
                 break
-        LOG.info(f"After linear and constant term analysis: {n_unset_vars} unset vars & {n_polys} polys")
+        LOG.info(f"SolutionSearchNode={self.id}: After affine term analysis "
+                 f"{n_unset_vars} unset vars & {n_polys} polys")
         if self.UNSOLVEABLE:
             self.TERMINAL = True
             return
@@ -417,14 +363,16 @@ class SolutionSearchNode(object):
         if not thread_timeout:
             grob_polys = new_basis["polys"]
             if set(self.polys) != set(grob_polys):
-                LOG.info(f"Groebner simplified {len(self.polys)} polys to {len(grob_polys)}")
+                LOG.info(f"SolutionSearchNode={self.id}: "
+                         f"Groebner simplified {len(self.polys)} polys to {len(grob_polys)}")
                 # How is it possible that I see Groebner making the polynomial sets larger!?
                 # I've witnessed this and want to always shrink the number of generators.
                 if len(grob_polys) <= len(self.polys):
                     self.polys = grob_polys
                     modified = True
         else:
-            LOG.info(f"Failed to compute Groebner basis after {run_time}s")
+            LOG.info(f"SolutionSearchNode={self.id}: "
+                     f"Failed to compute Groebner basis after {run_time}s")
         return modified
 
     def _check_for_const_polys(self):
