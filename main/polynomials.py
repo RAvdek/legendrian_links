@@ -5,15 +5,15 @@ import utils
 
 
 LOG = utils.LOG
-# This must be an int!
-GROEBNER_TIMEOUT_DEFAULT = 1
+# How long (in seconds) before we abandon computing Groebner bases?
+GROEBNER_TIMEOUT_DEFAULT = .1
 UNSET_VAR = None
 
 
 @utils.log_start_stop
 def zero_set(
         polys, symbols, modulus=2,
-        subs_dicts=[dict()], existence_only=False,
+        subs_dicts=None, existence_only=False,
         groebner_timeout=GROEBNER_TIMEOUT_DEFAULT,
         allow_unset=False):
     """
@@ -37,6 +37,8 @@ def zero_set(
     LOG.info(f"Searching for zero set of {len(polys)} polynomials in {len(symbols)} variables")
     if modulus == 0:
         raise ValueError("We can only solve for zero sets over Z/mZ with m!=0.")
+    if subs_dicts is None:
+        subs_dicts = [dict()]
     roots = [
         SolutionSearchNode(
             polys=polys,
@@ -44,6 +46,7 @@ def zero_set(
             modulus=modulus,
             subs_dict=subs_dict,
             groebner_timeout=groebner_timeout,
+            depth=0,
             allow_unset=allow_unset
         )
         for subs_dict in subs_dicts
@@ -74,6 +77,56 @@ def zero_set(
     if existence_only:
         return len(solution_nodes) > 0
     return [node.subs_dict for node in solution_nodes]
+
+
+def filtered_zero_set(polys, symbols, filtration_levels, modulus=2, groebner_timeout=GROEBNER_TIMEOUT_DEFAULT):
+    if modulus == 0:
+        raise ValueError("We can only solve for zero sets over Z/mZ with m!=0.")
+    f_level_values = sorted(utils.unique_elements(list(filtration_levels.values())))
+    f_to_sym = {
+        f: {sym for sym in symbols if filtration_levels[sym] == f}
+        for f in f_level_values
+    }
+    cum_sym = set()
+    f_to_sym_cum = dict()
+    for f in f_level_values:
+        cum_sym.update(f_to_sym[f])
+        f_to_sym_cum[f] = cum_sym.copy()
+    poly_to_symbols = {p: poly_symbols(p) for p in polys}
+    f_to_poly = {
+        f: {k for k, v in poly_to_symbols.items() if v.issubset(f_to_sym_cum[f])}
+        for f in f_level_values
+    }
+    subs_dicts = [dict()]
+    running_symbols = set()
+    for f in f_level_values:
+        running_symbols.update(f_to_sym[f])
+        f_polys = [
+            {sympy.Poly(p, *running_symbols, modulus=modulus).subs(d) for p in f_to_poly[f]}
+            for d in subs_dicts
+        ]
+        f_polys_unique = utils.unique_elements(f_polys)
+        LOG.info(f"At filtration level={f}: {len(subs_dicts)} prior augmentations give "
+                 f"{len(f_polys_unique)} unique extension problems")
+        f_polys_index_map = [f_polys_unique.index(p) for p in f_polys]
+        extension_subs = [
+            zero_set(
+                polys=poly_set,
+                symbols=f_to_sym[f],
+                modulus=modulus,
+                groebner_timeout=groebner_timeout
+            )
+            for poly_set in f_polys_unique
+        ]
+        new_subs = []
+        for i in range(len(subs_dicts)):
+            d = subs_dicts[i]
+            unique_index = f_polys_index_map[i]
+            d_extensions = extension_subs[unique_index]
+            for ext in d_extensions:
+                new_subs.append({**d, **ext})
+        subs_dicts = new_subs
+    return subs_dicts
 
 
 @utils.log_start_stop
@@ -224,21 +277,24 @@ def highest_frequency_symbol(polys, symbols):
 
 class SolutionSearchNode(object):
 
-    def __init__(self, polys, symbols, modulus, subs_dict,
+    def __init__(self, polys, symbols, modulus, subs_dict, depth,
                  groebner_timeout=GROEBNER_TIMEOUT_DEFAULT, allow_unset=False):
         self.polys = [sympy.Poly(p, *symbols, modulus=modulus) for p in polys]
         self.symbols = symbols
         self.modulus = modulus
         self.subs_dict = subs_dict
+        self.depth = depth
+        self._set_id()
         self.groebner_timeout = groebner_timeout
         self.allow_unset = allow_unset
         self.TERMINAL = False
         self.UNSOLVEABLE = False
         self.ff_elements = finite_field_elements(self.modulus)
-        self.id = utils.tiny_id()
         if (len(self.polys) > 0) and (len(self.get_unset_vars()) > 0):
             self._setup_subs()
             self._apply_subs()
+            self._unique_polys()
+            self._setup_quads()
             self._update_subs_and_polys()
             self._cleanup_subs()
         self._check_unset_vars()
@@ -269,16 +325,29 @@ class SolutionSearchNode(object):
                     polys=self.polys,
                     symbols=self.symbols,
                     modulus=self.modulus,
-                    subs_dict=subs
+                    subs_dict=subs,
+                    depth=self.depth + 1,
+                    allow_unset=self.allow_unset
                 )
             )
         return output
 
+    def _set_id(self):
+        self.id = "{" + f"D={self.depth}:id=" + utils.tiny_id() + "}"
+
+    def _setup_quads(self):
+        if self.modulus == 2:
+            self._quads = set()
+            unset_symbols = self.get_unset_vars()
+            for s_1 in unset_symbols:
+                for s_2 in unset_symbols:
+                    self._quads.add(s_1 * s_2)
+
     def _setup_subs(self):
         if self.allow_unset:
-            for k, v in self.subs_dict.items():
-                if v is UNSET_VAR:
-                    del self.subs_dict[k]
+            keys_to_del = [k for k, v in self.subs_dict.items() if v is UNSET_VAR]
+            for k in keys_to_del:
+                del self.subs_dict[k]
 
     def _cleanup_subs(self):
         if self.allow_unset:
@@ -286,11 +355,9 @@ class SolutionSearchNode(object):
                 for g in self.get_unset_vars():
                     self.subs_dict[g] = UNSET_VAR
 
-
     def _check_unset_vars(self):
         if len(self.get_unset_vars()) == 0:
             self.TERMINAL = True
-
 
     def _update_subs_and_polys(self):
         """Update self.subs_dict and self.polys
@@ -304,23 +371,15 @@ class SolutionSearchNode(object):
         n_polys = len(self.polys)
         if n_polys == 0:
             return
-        while not self.UNSOLVEABLE:
-            LOG.info(f"SolutionSearchNode={self.id}: Update substitutions "
-                     f"with {n_unset_vars} unset vars & {n_polys} polys")
-            # Keep trying to simplify using brute force substitutions
-            #start_unset_vars = len(self.get_unset_vars())
-            #self._check_for_linear_polys()
-            #self._check_for_const_polys()
-            #n_unset_vars = len(self.get_unset_vars())
-            #n_polys = len(self.polys)
-            # Break and try Groebner if there was no effect
-            #if start_unset_vars == n_unset_vars:
-            #   break
-            modified = self._check_affine_polys()
-            if not modified:
-                break
-        LOG.info(f"SolutionSearchNode={self.id}: After affine term analysis "
+        LOG.info(f"SolutionSearchNode={self.id}: "
                  f"{n_unset_vars} unset vars & {n_polys} polys")
+        while not self.UNSOLVEABLE:
+            self._manually_reduce_polys()
+            n_old_unset_vars = n_unset_vars
+            n_unset_vars = len(self.get_unset_vars())
+            # Break if we didn't eliminate any variables
+            if n_unset_vars == n_old_unset_vars:
+                break
         if self.UNSOLVEABLE:
             self.TERMINAL = True
             return
@@ -338,10 +397,12 @@ class SolutionSearchNode(object):
         :return: None
         """
         if specific_subs is not None:
-            self.polys = utils.unique_elements([p.subs(specific_subs) for p in self.polys])
+            self.polys = [p.subs(specific_subs) for p in self.polys]
         else:
-            self.polys = utils.unique_elements([p.subs(self.subs_dict) for p in self.polys])
+            self.polys = [p.subs(self.subs_dict) for p in self.polys]
 
+    def _unique_polys(self):
+        self.polys = utils.unique_elements(self.polys)
 
     def _simplify_polys(self):
         """Attempt to simplify ideal for polynomials using Groebner bases until timeout.
@@ -378,21 +439,56 @@ class SolutionSearchNode(object):
                     modified = True
         return modified
 
-    def _check_affine_polys(self):
-        for p in self.polys:
+    def _manually_reduce_polys(self):
+        """Make a single pass over self.polys, checking for affine terms (ax + b)
+        Currently this works over Z/2Z. Need to divide by a in general.
+
+        :return: Bool. Are we modifying the set of polynomials?
+        """
+        n_polys = len(self.polys)
+        del_indicies = set()
+        modified = False
+        for i in range(n_polys):
+            p = self.polys[i]
             p_exp = p.as_expr()
+            # remove zero polynomials
             if p_exp == 0:
-                self.polys.remove(p)
+                del_indicies.add(i)
+                modified = True
                 continue
+            # if a poly is non-zero constant, we can never find a zero
             if p_exp.is_number:
-                # Must be non-zero meaning no solutions
+                # Must be non-zero due to previous `if`
                 self.TERMINAL = True
                 self.UNSOLVEABLE = True
-                return True
+                modified = True
+                break
+            # check for terms of the form p = g - c for g a symbol
             for c in self.ff_elements:
                 p_min_c = p_exp - c
                 if p_min_c.is_symbol:
-                    self.polys.remove(p)
+                    del_indicies.add(i)
                     self.subs_dict[p_min_c] = c
                     self._apply_subs(specific_subs={p_min_c: c})
-                    return True
+                    modified = True
+                    break
+            # over Z/2Z we can also manually remove quadratic terms.
+            # I've seen these come up frequently.
+            # p = sym_1 * sym_2 + 1 = 0 => both are 1.
+            # we should be able to generalize this to things of the form p = 1 + x_1 * ... * x_k
+            # though I don't know how useful it would be
+            if self.modulus == 2:
+                # this is poorly designed: p_exp + 1 won't be in self._quads,
+                # even though elements may agree over Z/2Z
+                if p_exp - 1 in self._quads:
+                    del_indicies.add(i)
+                    # this will extract the individual factors
+                    sym_1, sym_2 = (p_exp - 1).as_ordered_factors()
+                    self.subs_dict[sym_1] = 1
+                    self.subs_dict[sym_2] = 1
+                    self._apply_subs(specific_subs={sym_1: 1, sym_2: 1})
+                    modified = True
+        if modified:
+            self.polys = [v for i, v in enumerate(self.polys) if i not in del_indicies]
+            self._unique_polys()
+        return modified

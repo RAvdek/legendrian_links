@@ -57,7 +57,8 @@ def timeout_ctx(time):
     # Register a function to raise a TimeoutError on the signal.
     signal.signal(signal.SIGALRM, raise_timeout_error)
     # Schedule the signal to be sent after ``time``.
-    signal.alarm(time)
+    # Using signal.alarm(time) requires time to be int while signal.setitimer allows float.
+    signal.setitimer(signal.ITIMER_REAL, time)
     try:
         yield
     except TimeoutError:

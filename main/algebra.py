@@ -484,10 +484,12 @@ class DGA(DGBase):
         self._aug_vars_set = True
 
     @utils.log_start_stop
-    def set_augmentations(self, batch_size=None):
+    def set_augmentations(self, batch_size=None, filtered=False):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
+        if filtered and batch_size is not None:
+            raise ValueError("Cannot do batch and filtered simultaneously")
         if not self._aug_vars_set:
             self.set_aug_data()
         zero_graded_symbols = list(self.aug_symbols_to_comm_symbols.keys())
@@ -498,6 +500,14 @@ class DGA(DGBase):
             if batch_size is not None:
                 comm_augmentations = polynomials.batch_zero_set(
                     polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod, batch_size=batch_size)
+            elif filtered:
+                comm_filtration_levels = {
+                    v: self.filtration_levels[k]
+                    for k, v in self.aug_symbols_to_comm_symbols.items()
+                }
+                comm_augmentations = polynomials.filtered_zero_set(
+                    polys=self.aug_polys, symbols=comm_symbols,
+                    filtration_levels=comm_filtration_levels, modulus=self.coeff_mod)
             else:
                 comm_augmentations = polynomials.zero_set(
                     polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod)

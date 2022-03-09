@@ -1006,11 +1006,13 @@ class PlatDiagram(object):
         class DiskExtension(object):
             """Extension of a holomorphic disk obtained by attaching RSFT generators to negative punctures"""
 
-            def __init__(self, disk, output_gens=[]):
+            def __init__(self, disk, output_gens=None):
                 """
                 :param disk: Disk instance
                 :param gens: list of RSFT generators
                 """
+                if output_gens is None:
+                    output_gens = []
                 self.disk = disk
                 self.output_gens = output_gens
                 self._set_disk_asymptotics()
