@@ -1,7 +1,10 @@
+from contextlib import contextmanager
 import json
 import logging
 import random
+import signal
 import string
+import threading
 
 
 with open('links.json') as f:
@@ -42,6 +45,31 @@ def tiny_id(k=4):
     :return: str
     """
     return ''.join(random.choices(string.ascii_letters + string.digits, k=k))
+
+
+# Timeout context from https://www.jujens.eu/posts/en/2018/Jun/02/python-timeout-function/#:~:text=You%20can%20use%20signals%20and,alarm%20signal%20for%20the%20timeout.
+# It only works in main thread as `signal.signal` can only make calls from the main thread.
+
+@contextmanager
+def timeout_ctx(time):
+    if not threading.current_thread() == threading.main_thread():
+        raise RuntimeError("Trying to use timeout_ctx outside of main thread.")
+    # Register a function to raise a TimeoutError on the signal.
+    signal.signal(signal.SIGALRM, raise_timeout_error)
+    # Schedule the signal to be sent after ``time``.
+    signal.alarm(time)
+    try:
+        yield
+    except TimeoutError:
+        pass
+    finally:
+        # Unregister the signal so it won't be triggered
+        # if the timeout is not reached.
+        signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+
+def raise_timeout_error(signum, frame):
+    raise TimeoutError
 
 
 # Methods for manipulating lists

@@ -64,16 +64,18 @@ This tells us that in order to enumerate all augmentations of the DGA, we need t
 2022-03-08 11:25:07,584|utils|INFO|Ending execution batch_zero_set
 2022-03-08 11:25:07,584|utils|INFO|Found 0 augmentations of DGA
 ```
-After about 70 minutes we see that the RSFT DGA has no augmentations! This computation would have been impossible without batch processing due to memory constraints of my laptop.
+After about 70 minutes we see that the RSFT DGA has no augmentations! This computation would have been impossible on my laptop without batch processing due to memory constraints.
+
+# Technical notes on threading and Groebner bases
+
+Groebner basis computations used to search for augmentations can be very heavy and they are skipped if they take too long. This timeout functionality is very difficult to implement when using the web app (for threading reasons). In general, Groebner computations will be skipped whenever `pd.rsft_dga.set_augmentations(...)` or `polynomials.zero_set(...)` are called outside of the main thread.
 
 # To do list
 
 ## Features
 
-- Some threads used for Groebner appear to never die.
-- During set spawn, we take a cartesian product over all of the sunset variables. We should avoid this so we don't spawn billions of nodes. Currently implemented but needs to be undoable from `algebra.py` or `polynomials.py`.
 - Way behind on testing...
-- Application may be maintaining some variables between requests?
+- Application is maintaining some variables between requests?
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
 - Copy knot tables. Have to remember how to translate Sivek front crossing notation to mine.
