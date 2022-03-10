@@ -50,14 +50,18 @@ def tiny_id(k=4):
 # Timeout context from https://www.jujens.eu/posts/en/2018/Jun/02/python-timeout-function/#:~:text=You%20can%20use%20signals%20and,alarm%20signal%20for%20the%20timeout.
 # It only works in main thread as `signal.signal` can only make calls from the main thread.
 
+def in_main_thread():
+    return threading.current_thread() == threading.main_thread()
+
 @contextmanager
 def timeout_ctx(time):
-    if not threading.current_thread() == threading.main_thread():
+    if not in_main_thread():
         raise RuntimeError("Trying to use timeout_ctx outside of main thread.")
     # Register a function to raise a TimeoutError on the signal.
     signal.signal(signal.SIGALRM, raise_timeout_error)
     # Schedule the signal to be sent after ``time``.
     # Using signal.alarm(time) requires time to be int while signal.setitimer allows float.
+    # This is essential as waiting 1 second can be extremely expensive.
     signal.setitimer(signal.ITIMER_REAL, time)
     try:
         yield

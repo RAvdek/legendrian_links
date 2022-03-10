@@ -28,43 +28,25 @@ Only use the web interface to compute augmentations for links with small numbers
 
 # Python interface & batch processing
 
-Computing augmentations of DGAs with large numbers of generators can take hours or be impossible due to memory constraints. Even computing gradings for DGAs can be time consuming. We use batch processing to deal with these cases. For an example, suppose we want to compute augmentations of the RSFT algebra of the 2-copy of the [famous slice knot](https://arxiv.org/pdf/1301.3767.pdf) `m(9_46)`.
+Computing augmentations of DGAs with large numbers of generators can take hours or be impossible due to memory constraints. Even computing gradings for DGAs can be time consuming.
 
 Run the following code from inside the `main/` folder to setup the `PlatDiagram` object:
 ```
 $ python
 >>> import legendrian_links as ll
->>> front = [1,2,3,4,2,0,1,4,1,2,0,3,1,3,2,4,1,3]
->>> pd = ll.PlatDiagram(n_strands=6, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=True, lazy_rsft=True)
->>> pd.set_rsft(lazy_augs=True, lazy_bilin=True)
+>>> front = [1 for _ in range(21)]
+>>> pd = ll.PlatDiagram(n_strands=4, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=True, lazy_rsft=True)
+>>> pd.set_lch(lazy_augs=True, lazy_bilin=True)
+>>> pd.lch_dga.set_augmentations()
+>>> pd.lch_dga.set_all_bilin()
 ```
-The `lazy...` options prevent the program from jumping into too many heavy calculations. A bunch of data will be logged to the command line:
+The `lazy...` options can prevent the kick-off of some potentially heavy computations. Some experimental options for `set_augmentations` are trying to help speed up computations (see the code). We can also fun the above with less commands:
 ```
-2022-03-08 10:10:00,488|utils|INFO|DGA has 180 generators with 0 grading
-2022-03-08 10:10:00,492|utils|INFO|Differentials required to compute augs: 304
-...
-2022-03-08 10:13:31,488|utils|INFO|Aug analysis table:
-{'symbol': {22}, 'freq': 140, 'n_cum_polys': 0, 'poly_to_sym_ratio': 0.0}
-...
-{'symbol': {13}, 'freq': 40, 'n_cum_polys': 7, 'poly_to_sym_ratio': 0.5}
-...
-{'symbol': {4,23}, 'freq': 6, 'n_cum_polys': 100, 'poly_to_sym_ratio': 1.2345679012345678}
-...
-{'symbol': {43,4}, 'freq': 4, 'n_cum_polys': 251, 'poly_to_sym_ratio': 1.56875}
-...
-{'symbol': {71,32}, 'freq': 2, 'n_cum_polys': 304, 'poly_to_sym_ratio': 1.6888888888888889}
+$ python
+>>> import legendrian_links as ll
+>>> front = [1 for _ in range(21)]
+>>> pd = ll.PlatDiagram(n_strands=4, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=False, lazy_rsft=True)
 ```
-This tells us that in order to enumerate all augmentations of the DGA, we need to find the common zero set of 304 polynomials in 180 variables over Z/2Z. Batch processing allows us to solve a subset of the polynomials first, and then iteratively add more polynomials. Looking at 'poly_to_sym_ratio' in the logs, if we try work with the first 7 polynomials, we will have a very sparse problem (with more variables than polynomials). If we work with the first 251 polynomials, the problem will be less sparse but this might be too much data to process at once. We'll go with 100:
-```
->>> pd.rsft_dga.set_augmentations(batch_size=100)
-2022-03-08 10:15:20,450|utils|INFO|Starting execution set_augmentations
-...
-2022-03-08 11:25:07,513|utils|INFO|95th loop of zero_set search: 95 nodes, 95 spawned nodes, 0 solution nodes
-2022-03-08 11:25:07,584|utils|INFO|Ending execution zero_set
-2022-03-08 11:25:07,584|utils|INFO|Ending execution batch_zero_set
-2022-03-08 11:25:07,584|utils|INFO|Found 0 augmentations of DGA
-```
-After about 70 minutes we see that the RSFT DGA has no augmentations! This computation would have been impossible on my laptop without batch processing due to memory constraints.
 
 # Technical notes on threading and Groebner bases
 
@@ -75,7 +57,7 @@ Groebner basis computations used to search for augmentations can be very heavy a
 ## Features
 
 - Way behind on testing...
-- Application is maintaining some variables between requests?
+- Application is maintaining some variables between requests? I think this is due to mutable function args. Should be solved now.
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
 - Copy knot tables. Have to remember how to translate Sivek front crossing notation to mine.

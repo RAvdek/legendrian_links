@@ -107,31 +107,59 @@ class TestLinks(unittest.TestCase):
         self.assertFalse(hopf.word_is_admissible([chord_1, chord_2, chord_1, chord_2], cyclic=True))
 
 
-class TestAugsearch(unittest.TestCase):
+class TestZeroSet(unittest.TestCase):
+
+    def setUp(self):
+        self.a, self.b, self.c = sympy.symbols('a,b,c')
+        self.symbols = [self.a, self.b, self.c]
+
+    def test_non_zero_const(self):
+        polys = [1]
+        output = polynomials.zero_set(polys=polys, symbols=self.symbols)
+        self.assertEqual(len(output), 0)
+
+    def test_zero_const(self):
+        polys = [0]
+        output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=False)
+        self.assertEqual(len(output), 8)
+        output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=True)
+        self.assertEqual(len(output), 1)
+
+    def test_quad(self):
+        polys = [1 + self.a*self.b]
+        expected_output = [{self.a: 1, self.b: 1}]
+        output = polynomials.zero_set(polys=polys, symbols=[self.a, self.b], allow_unset=False)
+        self.assertEqual(expected_output, output)
+
+        expected_output = [{self.a: 1, self.b: 1, self.c: polynomials.UNSET_VAR}]
+        output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=True)
+        self.assertEqual(expected_output, output)
+
+    def test_deg_three(self):
+        polys = [1 + self.a * self.b * self.c]
+        expected_output = [{self.a: 1, self.b: 1, self.c: 1}]
+        output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=False)
+        self.assertEqual(expected_output, output)
 
     def test_trefoil(self):
-        x, y, z = sympy.symbols('x,y,z')
-        symbols = [x, y, z]
-        polys = [1 + x + z + x * y * z]
-        results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2)
+        polys = [1 + self.a + self.c + self.a * self.b * self.c]
+        results = polynomials.zero_set(polys=polys, symbols=self.symbols, modulus=2)
         expected_results = [
-            {x: 0, z: 1, y: 0},
-            {x: 0, z: 1, y: 1},
-            {x: 1, y: 0, z: 0},
-            {x: 1, y: 1, z: 0},
-            {x: 1, y: 1, z: 1}
+            {self.a: 0, self.c: 1, self.b: 0},
+            {self.a: 0, self.c: 1, self.b: 1},
+            {self.a: 1, self.b: 0, self.c: 0},
+            {self.a: 1, self.b: 1, self.c: 0},
+            {self.a: 1, self.b: 1, self.c: 1}
         ]
         self.assertEqual(comparable_list_of_dicts(results), comparable_list_of_dicts(expected_results))
 
     def test_hopf_link(self):
-        x, y = sympy.symbols('x,y')
-        symbols = [x, y]
-        polys = [y * x]
-        results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2)
+        polys = [self.a * self.b]
+        results = polynomials.zero_set(polys=polys, symbols=[self.a, self.b], modulus=2)
         expected_results = [
-            {x: 1, y: 0},
-            {x: 0, y: 0},
-            {x: 0, y: 1}
+            {self.a: 1, self.b: 0},
+            {self.a: 0, self.b: 0},
+            {self.a: 0, self.b: 1}
         ]
         self.assertEqual(comparable_list_of_dicts(results), comparable_list_of_dicts(expected_results))
 
