@@ -79,6 +79,15 @@ def raise_timeout_error(signum, frame):
 
 # Methods for manipulating lists
 
+def prod(array):
+    """Annoyingly, math.prod missing from some versions of python"""
+    if len(array) == 0:
+        return None
+    output = array.pop(0)
+    while len(array) > 0:
+        output *= array.pop(0)
+    return output
+
 
 def is_nonrepeating(array):
     """Are the elements in a tuple unique? Will have to do this over and over...

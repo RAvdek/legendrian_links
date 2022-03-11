@@ -1,5 +1,4 @@
 from collections import Counter
-from math import prod
 import numpy as np
 import sympy
 import utils
@@ -41,9 +40,9 @@ class Differential(object):
                 elif not monom.is_number:
                     args = monom.args
                     for i in range(len(args)):
-                        factor_1 = prod([s.subs(subs_1) for s in args[:i]])
+                        factor_1 = utils.prod([s.subs(subs_1) for s in args[:i]])
                         linear_term = args[i]
-                        factor_2 = prod([s.subs(subs_2) for s in args[i+1:]])
+                        factor_2 = utils.prod([s.subs(subs_2) for s in args[i+1:]])
                         summand = coeff * factor_1 * linear_term * factor_2
                         output_summands.append(summand)
             output = sum(output_summands)

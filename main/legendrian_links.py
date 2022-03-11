@@ -1,4 +1,3 @@
-from math import prod
 import sympy
 import algebra
 import utils
@@ -948,7 +947,7 @@ class PlatDiagram(object):
                 neg_word = [1]
             # Add negative word of chords as a summand to the LCH
             # TODO: Add sign contributions
-            lch_del[pos_generator] += prod(neg_word)
+            lch_del[pos_generator] += utils.prod(neg_word)
         lch_del = {
             g.symbol: algebra.Differential(lch_del[g])
             for g in lch_del.keys()
@@ -1148,7 +1147,7 @@ class PlatDiagram(object):
                             output_words[0] = first_output_word
                             output_gens = [self.get_rsft_generator_from_word(w) for w in output_words]
                         output_symbols = [g.symbol for g in output_gens]
-                        output_monomial = prod(output_symbols)
+                        output_monomial = utils.prod(output_symbols)
                         rsft_del[input_generator] += output_monomial
         rsft_del = {
             g.symbol: algebra.Differential(rsft_del[g])
