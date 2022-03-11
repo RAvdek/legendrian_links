@@ -12,6 +12,18 @@ Poincare polynomials for {{ ctx["name"] }} augmentations
   {% endfor %}
 </table>
 <br>
+Dual Poincare polynomials for {{ ctx["name"] }} augmentations
+<table>
+  <tr>
+    <th>Aug indices</th>{% for j in range(ctx["n_augs"]) %}<th>{{ j }}</th>{% endfor %}
+  </tr>
+  {% for i in range(ctx["n_augs"]) %}
+  <tr>
+    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys_dual"][i][j] }}</th>{% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+<br>
 {{ ctx["name"] }} has {{ ctx["n_augs"] }} augmentations
 <table>
   <tr>

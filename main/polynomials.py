@@ -302,7 +302,7 @@ class SubsNode(object):
                     if k in output.keys():
                         old = output[k]
                         if old != v:
-                            raise RuntimeError(f"Found duplicate subs, old={k}:{output[k]}, new={k}:{v}")
+                            raise RuntimeError(f"Found mismatching duplicate subs, old={k}:{output[k]}, new={k}:{v}")
                     output[k] = v
 
 

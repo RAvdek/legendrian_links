@@ -193,11 +193,16 @@ class LinearMap(object):
         self.coeff_dict = coeff_dict
         self.range_symbols = range_symbols
         self.coeff_mod = coeff_mod
+        self._set_dims()
         self._set_input_vars()
         self._set_matrix()
 
     def __repr__(self):
         return str(self.coeff_dict)
+
+    def _set_dims(self):
+        self.dim_dom = len(self.coeff_dict.keys())
+        self.dim_range = len(self.range_symbols)
 
     def _set_input_vars(self):
         """Encode input and output symbols as `onehot` vectors so that they could be turned into a matrix"""
@@ -292,10 +297,10 @@ class ChainComplex(DGBase):
         # We have to use a dictionary because the degrees may be non-positive
         self.linear_maps = dict()
         for i in self.gradings.values():
-            j = i - 1
+            i_min_1 = i - 1
             if self.grading_mod != 0:
-                j %= self.grading_mod
-            range_symbols = [s for s in self.symbols if self.gradings[s] == j]
+                i_min_1 %= self.grading_mod
+            range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
             domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
             diffs = {s: self.differentials[s].expression for s in domain_symbols}
             self.linear_maps[i] = LinearMap(
@@ -306,26 +311,45 @@ class ChainComplex(DGBase):
 
     def _set_poincare_poly(self):
         output_dict = dict()
+        output_dual_dict = dict()
         for i in self.linear_maps.keys():
-            j = i - 1
+            i_min_1 = i - 1
             if self.grading_mod != 0:
-                j %= self.grading_mod
+                i_min_1 %= self.grading_mod
             linear_map = self.linear_maps[i]
             rank_im = linear_map.matrix.rank_im
+            rank_im_dual = rank_im
             rank_ker = linear_map.matrix.rank_ker
+            rank_ker_dual = linear_map.dim_range - rank_im_dual
+            # Sum up bettis
             if i in output_dict.keys():
                 output_dict[i] += rank_ker
             else:
                 output_dict[i] = rank_ker
-            if j in output_dict.keys():
-                output_dict[j] -= rank_im
+            if i_min_1 in output_dict.keys():
+                output_dict[i_min_1] -= rank_im
             else:
-                output_dict[j] = -rank_im
+                output_dict[i_min_1] = -rank_im
+            # Sum up dual bettis
+            if i_min_1 in output_dual_dict.keys():
+                output_dual_dict[i_min_1] += rank_ker_dual
+            else:
+                output_dual_dict[i_min_1] = rank_ker_dual
+            if i in output_dual_dict.keys():
+                output_dual_dict[i] -= rank_im_dual
+            else:
+                output_dual_dict[i] = -rank_im_dual
         t = sympy.Symbol('t')
+        # poincare poly
         output = 0
         for i in output_dict.keys():
             output += output_dict[i] * (t ** i)
+        # dual poly
+        output_dual = 0
+        for i in output_dual_dict.keys():
+            output_dual += output_dual_dict[i] * (t ** i)
         self.poincare_poly = output
+        self.poincare_poly_dual = output_dual
 
 
 class DGA(DGBase):
@@ -342,6 +366,7 @@ class DGA(DGBase):
         self.augmentations = None
         self.n_augs = None
         self.bilin_polys = None
+        self.bilin_polys_dual = None
         self.lazy_aug_data = lazy_aug_data
         self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
@@ -396,8 +421,8 @@ class DGA(DGBase):
                     grading_mod=self.grading_mod,
                     coeff_mod=self.coeff_mod
                 )
-                poincare_poly = cx.poincare_poly
-                self.bilin_polys[i][j] = poincare_poly
+                self.bilin_polys[i][j] = cx.poincare_poly
+                self.bilin_polys_dual[i][j] = cx.poincare_poly_dual
                 bilin_counter += 1
                 if bilin_counter % log_frequency == 0:
                     LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
@@ -520,3 +545,4 @@ class DGA(DGBase):
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
         self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
+        self.bilin_polys_dual = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]

@@ -12,8 +12,8 @@ To install and run the server from your terminal from the root of the project:
 
 ```
 $ python3 -m pip install pipenv
-$ pipenv install
-$ pipenv shell
+$ python3 -m pipenv install
+$ python3 -m pipenv shell
 $ cd main
 $ python app.py
 ```
@@ -56,6 +56,8 @@ Groebner basis computations used to search for augmentations can be very heavy a
 
 ## Features
 
+- Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
+- Command line interface would make it easy to run scripts.
 - Way behind on testing...
 - Application is maintaining some variables between requests? I think this is due to mutable function args. Should be solved now.
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.

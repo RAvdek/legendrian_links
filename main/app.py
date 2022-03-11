@@ -116,6 +116,7 @@ def get_dga_context(dga, name):
     output["deg_0_gens"] = deg_0_gens
     output["augs"] = [{g["name"]: aug[g["symbol"]] for g in deg_0_gens} for aug in dga.augmentations]
     output["bilin_polys"] = dga.bilin_polys
+    output["bilin_polys_dual"] = dga.bilin_polys_dual
     return output
 
 
