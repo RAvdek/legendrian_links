@@ -24,19 +24,124 @@
     "n_strands": 6,
     "front_crossings": [3, 1, 2, 2, 1, 3, 3]
   },
-  "m9_46": {
-    "comment": "Simplest non-trivial Lagrangian slice knot from https://arxiv.org/pdf/1301.3767.pdf. Has 2 homotopy classes of augmentations.",
+  "K9_46": {
+    "front_crossings": [1,3,5,2,4,2,3,4,4,5,1,2,3,0,1],
+    "n_strands": 7,
+    "comment": "slice from lch.sage. Simplest non-trivial Lagrangian slice knot from https://arxiv.org/pdf/1301.3767.pdf. Has 2 homotopy classes of augmentations."
+  },
+  "K10_140_1": {
+    "front_crossings": [3,4,4,2,3,5,6,1,0,4,5,2,1,1,3,5,0,2,4,6,0,1,2,6,5,2,3],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K10_140_2": {
+    "front_crossings": [1,2,0,2,3,4,1,2,3,1,0,3,2,4,0,3,1,3,2,4,3,1],
     "n_strands": 6,
-    "front_crossings": [1,2,3,4,2,0,1,4,1,2,0,3,1,3,2,4,1,3]
+    "comment": "slice from lch.sage"
   },
-  "m10_140": {
-    "comment": "Slice knot with DGA iso to the unknot DGA... from Appendix of https://arxiv.org/pdf/1811.10966.pdf. For this plat, there are two augmentations which are necessarily homotopic.",
+  "K11n139": {
+    "front_crossings": [1,3,5,2,4,3,2,5,3,2,4,1,3,2,3,5,2,1,3],
+    "n_strands": 7,
+    "comment": "slice from lch.sage"
+  },
+  "K12n582": {
+    "front_crossings": [1,0,0,3,2,1,1,4,4,3,5,2,2,1,7,6,6,5,4,3,8,7,6,5],
     "n_strands": 10,
-    "front_crossings": [3,4,5,6,7,1,2,3,4,5,6,6,5,4,4,6,1,3,5,7]
+    "comment": "slice from lch.sage"
   },
-  "twisted_double_m10_140": {
-    "comment": "Twisted double of m10_140",
-    "n_strands": 20,
-    "front_crossings": [1,5,9,13,17,7,8,6,7,9,10,8,9,11,12,10,11,13,14,12,13,15,16,14,15,3,4,2,3,5,6,4,5,7,8,6,7,9,10,8,9,11,12,10,11,13,14,12,13,13,14,12,13,11,12,10,11,9,10,8,9,9,10,8,9,13,14,12,13,3,4,2,3,7,8,6,7,11,12,10,11,15,16,14,15,1,5,9,13,18,18,17]
+  "K12n768": {
+    "front_crossings": [1,3,2,1,0,4,3,3,2,1,1,0,5,4,3,2,1,3,3,2,5,4,6,6,5,4,3],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K12n838": {
+    "front_crossings": [1,3,2,2,1,0,5,4,3,2,1,6,6,5,4,5,4,3,2,1,5,4,6,2,3,6,5],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K13n579 ": {
+    "front_crossings": [1,3,5,4,3,2,1,0,6,5,5,4,4,3,3,2,1,6,5,4,3,3,2,1,5,4,3],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K13n3158": {
+    "front_crossings": [1,0,2,3,2,4,5,4,3,2,6,5,4,4,3,3,2,2,1,1,0,3,2,1,6,5,5,4,3,6,5],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K13n3523": {
+    "front_crossings": [1,0,2,2,1,3,5,4,1,0,4,3,2,1,7,6,5,4,3,8,7,6,5,7,6,5,4,8,7,7,6,8,8,7,6,5],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K13n4514": {
+    "front_crossings": [1,0,3,2,5,4,3,2,1,6,5,4,4,3,5,4,4,3,2,5,5,4,6,6,5,4,3],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K13n4659": {
+    "front_crossings": [5,4,3,2,1,0,0,2,4,3,3,2,1,1,0,4,3,2,1,6,5,5,4,3,2,1,6,5,4,4,3],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K14n2459": {
+    "front_crossings": [3,2,1,0,0,2,1,5,4,3,2,2,1,5,4,3,3,6,5,4,4,3,7,6,5,8,7,7],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n2601": {
+    "front_crossings": [1,3,2,5,4,3,7,6,5,4,3,2,1,1,0,8,7,7,6,5,4,3,2,1,5,4,4,3,5,8,8,7],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n8579": {
+    "front_crossings": [1,3,5,4,4,3,2,2,1,5,4,3,2,2,1,4,3,6,5],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K14n12406": {
+    "front_crossings": [1,0,3,2,1,1,5,4,3,2,4,3,2,1,5,4,4,3,2,2,1,3,5],
+    "n_strands": 7,
+    "comment": "slice from lch.sage"
+  },
+  "K14n14251": {
+    "front_crossings": [1,3,2,1,4,5,4,3,2,6,2,1,1,0,6,5,7,7,6,5,4,3,2,8,7,6,5,4,4,3,2,1],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n15581": {
+    "front_crossings": [1,3,3,2,1,5,4,3,2,1,6,5,4,4,3,2,5,7,6,5,4,6,5,4,3,2,1,7,6,5,4,3,8,7,6,5],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n18212": {
+    "front_crossings": [1,3,2,5,4,7,6,5,4,8,7,6,8,7,6,5,5,4,3,2,1,0,0,6,5,4,3,2,1,8,7,6,5,8,7,7,6,5,8,7],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n21563": {
+    "front_crossings": [3,2,1,0,4,0,2,1,5,4,3,2,2,1,6,4,3,2,6,5,2,1,5,4,3,6,5],
+    "n_strands": 8,
+    "comment": "slice from lch.sage"
+  },
+  "K14n22150": {
+    "front_crossings": [1,3,2,2,1,0,5,4,3,6,3,2,1,0,0,7,6,5,4,3,2,1,8,5,4,3,8,7,6,5,5,4,3,7,6,5],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n22789": {
+    "front_crossings": [1,0,3,5,4,3,6,5,0,5,4,4,3,2,5,4,3,3,2,7,6,5,4,8,7,7,6,8,8,7,6,5,4,3,2,1],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n24246": {
+    "front_crossings": [1,0,3,2,1,1,0,3,2,4,3,3,0,5,4,3,2,1,2,6,5,5,4,3,6,5,7,6,5,8,7,7],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
+  },
+  "K14n25967": {
+    "front_crossings": [3,2,1,4,4,3,2,2,5,4,3,2,1,6,5,4,4,3,7,6,5,4,4,3,5,8,7,7],
+    "n_strands": 10,
+    "comment": "slice from lch.sage"
   }
 }

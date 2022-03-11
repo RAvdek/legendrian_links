@@ -67,6 +67,7 @@ def zero_set(
             break
         else:
             node = living_nodes.pop(0)
+            node.run()
             n_analyzed_nodes += 1
             if node.has_solution():
                 solution_nodes.append(node)
@@ -310,7 +311,17 @@ class SolutionSearchNode(object):
     """
     Similar to SubsNode, instances of this class form a tree. Data is reconstructed by traversing to the root.
     This way we don't have to store the data of all polynomials and all of their substitutions.
+
+    Usage pattern...
+    node = SolutionSearchNode(...) # set root node
+    node.run()                     # do a bunch of stuff
+    children = nodes.spawn         # get child nodes
+
     """
+    STATE_INIT = 0
+    STATE_RUNNING = 1
+    STATE_RUN_COMPLETE = 2
+    STATE_TEARDOWN_COMPLETE = 3
 
     def __init__(self, initial_subs_node, polys, symbols=None, modulus=None, parent=None,
                  groebner_timeout=GROEBNER_TIMEOUT_DEFAULT, allow_unset=False):
@@ -328,10 +339,14 @@ class SolutionSearchNode(object):
             self.groebner_timeout = groebner_timeout
             self.ff_elements = finite_field_elements(self.modulus)
         self.polys = [sympy.Poly(p, *self.symbols, modulus=self.modulus) for p in polys]
-        self._set_subs_dict()
         self._set_id()
         self.TERMINAL = False
         self.UNSOLVEABLE = False
+        self.state = self.STATE_INIT
+
+    def run(self):
+        self.state = self.STATE_RUNNING
+        self._set_subs_dict()
         self._setup_subs()
         self._apply_subs()
         if (len(self.polys) > 0) and (len(self.get_unset_vars()) > 0):
@@ -342,7 +357,9 @@ class SolutionSearchNode(object):
         self._set_subs_node()
         self._check_unset_vars()
         self._set_spawn()
+        self.state = self.STATE_RUN_COMPLETE
         self._teardown()
+        self.state = self.STATE_TEARDOWN_COMPLETE
 
     def _teardown(self):
         if self.parent is not None:

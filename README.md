@@ -18,6 +18,8 @@ $ cd main
 $ python app.py
 ```
 
+You may need to modify the version of python in Pipfile so that this is compatible with your system.
+
 # Web interface
 
 When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&auto_dgas=rsft`, giving a [polyfillable link](https://arxiv.org/abs/1307.7998):

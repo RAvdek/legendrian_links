@@ -80,9 +80,15 @@ def raise_timeout_error(signum, frame):
 # Methods for manipulating lists
 
 def prod(array):
-    """Annoyingly, math.prod missing from some versions of python"""
+    """
+    Take a product of a list of algebraic objects.
+    Annoyingly, math.prod missing from some versions of python...
+
+    :param array: list
+    :return: obj
+    """
     if len(array) == 0:
-        return None
+        return 1
     output = array.pop(0)
     while len(array) > 0:
         output *= array.pop(0)
