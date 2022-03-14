@@ -523,7 +523,9 @@ class SolutionSearchNode(object):
             self._update_subs_and_polys()
 
     def _apply_subs(self, specific_subs=None):
-        """Update self.polys by applying substitutions in self.subs_dict or specific_subs
+        """Update self.polys by applying substitutions in self.subs_dict or specific_subs.
+
+        Contract is that we do not remove items from or add items to self.polys.
 
         :param specific_subs: dict or None... substitutions to apply to self.polys
         :return: None
@@ -534,9 +536,8 @@ class SolutionSearchNode(object):
             subs_to_apply = specific_subs
         else:
             subs_to_apply = self.subs_dict
-        clean_subs_to_apply = {k: v for k, v in subs_to_apply if v is not UNSET_VAR}
+        clean_subs_to_apply = {k: v for k, v in subs_to_apply.items() if v is not UNSET_VAR}
         output = [p.subs(clean_subs_to_apply) for p in self.polys]
-        output = utils.unique_elements(output)
         self.polys = output
 
     def _unique_polys(self):
