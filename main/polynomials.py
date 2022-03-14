@@ -533,8 +533,9 @@ class SolutionSearchNode(object):
         if specific_subs is not None:
             subs_to_apply = specific_subs
         else:
-            subs_to_apply = {k:v for k, v in self.subs_dict.items() if v is not UNSET_VAR}
-        output = [p.subs(subs_to_apply) for p in self.polys]
+            subs_to_apply = self.subs_dict
+        clean_subs_to_apply = {k: v for k, v in subs_to_apply if v is not UNSET_VAR}
+        output = [p.subs(clean_subs_to_apply) for p in self.polys]
         output = utils.unique_elements(output)
         self.polys = output
 
