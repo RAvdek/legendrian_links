@@ -65,16 +65,38 @@ $ python
 ```
 The pickle functionality only stores the data of a DGA, so that we can recover old DGAs even after our code has been updated.
 
+# Technical notes
 
-# Technical notes on threading and Groebner bases
+## Threading and Groebner bases
 
 Groebner basis computations used to search for augmentations can be very heavy and they are skipped if they take too long. This timeout functionality is very difficult to implement when using the web app (for threading reasons). In general, Groebner computations will be skipped whenever `pd.rsft_dga.set_augmentations(...)` or `polynomials.zero_set(...)` are called outside of the main thread.
+
+## Recursion limits
+
+We use [sympy](https://www.sympy.org/en/index.html) to encode and manipulate polynomials. The functionality for performing variable substitutions in `sympy` relies on a [recursive method](https://github.com/sympy/sympy/blob/master/sympy/polys/densebasic.py#L452) which we've seen exceed python's [default recursion depth limit](https://stackoverflow.com/questions/3323001/what-is-the-maximum-recursion-depth-in-python-and-how-to-increase-it) for polynomials in ~300 variables. The error message looks like
+```
+  File ".../lib/python3.6/site-packages/sympy/polys/densebasic.py", line 474, in dmp_to_tuple
+    return tuple(dmp_to_tuple(c, v) for c in f)
+  File ".../lib/python3.6/site-packages/sympy/polys/densebasic.py", line 474, in <genexpr>
+    return tuple(dmp_to_tuple(c, v) for c in f)
+  File ".../lib/python3.6/site-packages/sympy/polys/densebasic.py", line 474, in dmp_to_tuple
+    return tuple(dmp_to_tuple(c, v) for c in f)
+  File ".../lib/python3.6/site-packages/sympy/polys/densebasic.py", line 474, in <genexpr>
+    return tuple(dmp_to_tuple(c, v) for c in f)
+RecursionError: maximum recursion depth exceeded
+```
+To manually override this, add the following lines to your code:
+```
+import sys
+sys.setrecursionlimit(10000)
+```
+I cannot guarantee that this is not a bad idea!
 
 # To do list
 
 ## Features
 
-- During zero_set search... If a variable appears in no polynomials, automatically make it unset. Unpack unset variables.
+- It seems that solving linear equations is the biggest waste of time, but these are the easiest to solve!
 - Capping paths is storing too much info. We really only need this for rotation numbers.
 - Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
 - Command line interface would make it easy to run scripts.
