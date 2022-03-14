@@ -3,3 +3,6 @@
 *.pyc
 *__pycache__*
 Pipfile.lock
+# Do not store the pickly stuff of nohup outfiles
+*.pk
+*.out

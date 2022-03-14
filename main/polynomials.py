@@ -9,6 +9,26 @@ GROEBNER_TIMEOUT_DEFAULT = .1
 UNSET_VAR = None
 
 
+def expand_zero_set_from_unset(zeros, modulus=2):
+    ff_elements = finite_field_elements(modulus)
+    output = list()
+    for z in zeros:
+        to_process = [z]
+        while len(to_process) > 0:
+            p = to_process.pop()
+            if any([v is UNSET_VAR for v in p.values()]):
+                new_ps = [p.copy() for _ in ff_elements]
+                to_modify = None
+                for k, v in p.items():
+                    if v is UNSET_VAR:
+                        to_modify = k
+                for i in ff_elements:
+                    new_ps[i][to_modify] = i
+                to_process += new_ps
+            else:
+                output.append(p)
+    return output
+
 @utils.log_start_stop
 def zero_set(
         polys, symbols, modulus=2,
@@ -237,7 +257,7 @@ def is_linear(poly):
 
 
 def poly_symbols(poly):
-    """Return a list of symbols which appears in a polynomial expression
+    """Return a set of symbols which appears in a polynomial expression
 
     :param poly:
     :return:
@@ -245,12 +265,23 @@ def poly_symbols(poly):
     # TODO: Requires testing
     output = set()
     poly = sympy.sympify(poly)
-    coeff_dict = poly.as_coefficients_dict()
+    coeff_dict = dict(poly.as_expr().as_coefficients_dict())
     for k in list(coeff_dict.keys()):
         if k.is_number:
             continue
         for x in k.as_terms()[-1]:
             output.add(x)
+    return output
+
+def many_poly_symbols(polys):
+    """Return a set of symbols which appears in a tuple of polynomial expressions
+
+    :param polys: list of polynomials
+    :return: set of symbols
+    """
+    output = set()
+    for p in polys:
+        output.update(poly_symbols(p))
     return output
 
 
@@ -262,9 +293,9 @@ def highest_frequency_symbol(polys, symbols):
     :return: symbol
     """
     # Ensure that the order of symbols in input match those in polys by re-initializing
-    polys = [sympy.Poly(p, *symbols) for p in polys]
+    polys_to_analyze = [sympy.Poly(p, *symbols) for p in polys]
     counter = {g: 0 for g in symbols}
-    for p in polys:
+    for p in polys_to_analyze:
         monoms = p.monoms()
         for m in monoms:
             for i in range(len(symbols)):
@@ -346,20 +377,39 @@ class SolutionSearchNode(object):
 
     def run(self):
         self.state = self.STATE_RUNNING
-        self._set_subs_dict()
-        self._setup_subs()
+        self._set_subs_dict_from_subs_node()
+        self._cleanup_subs_and_symbols()
         self._apply_subs()
         if (len(self.polys) > 0) and (len(self.get_unset_vars()) > 0):
             self._unique_polys()
             self._setup_quads()
             self._update_subs_and_polys()
-        self._cleanup_subs()
+        self._cleanup_subs_and_symbols()
         self._set_subs_node()
         self._check_unset_vars()
         self._set_spawn()
         self.state = self.STATE_RUN_COMPLETE
         self._teardown()
         self.state = self.STATE_TEARDOWN_COMPLETE
+
+    def get_unset_vars(self):
+        """
+        :return: list of symbols not already set by self.subs_dict
+        """
+        return [g for g in self.symbols if g not in self.subs_dict.keys()]
+
+    def has_solution(self):
+        """
+        :return: Bool for if the node has an already set solution
+        """
+        return self.TERMINAL and (not self.UNSOLVEABLE)
+
+    def get_symbols_in_polys(self):
+        """Get a set of symbols which appear in self.polys
+
+        :return: set
+        """
+        return many_poly_symbols(self.polys)
 
     def _teardown(self):
         if self.parent is not None:
@@ -385,7 +435,7 @@ class SolutionSearchNode(object):
         self.ff_elements = node.ff_elements
         self.depth = depth
 
-    def _set_subs_dict(self):
+    def _set_subs_dict_from_subs_node(self):
         self.subs_dict = self.initial_subs_node.full_subs()
 
     def _set_subs_node(self):
@@ -395,26 +445,20 @@ class SolutionSearchNode(object):
         }
         self.subs_node = SubsNode(subs=subs, parent=self.initial_subs_node)
 
-    def get_unset_vars(self):
-        """
-        :return: list of symbols not already set by self.subs_dict
-        """
-        return [g for g in self.symbols if g not in self.subs_dict.keys()]
-
-    def has_solution(self):
-        """
-        :return: Bool for if the node has an already set solution
-        """
-        return self.TERMINAL and (not self.UNSOLVEABLE)
-
     def _set_spawn(self):
         output = []
         if not self.TERMINAL:
             # We choose the symbol which appears in the most monomials
             g = highest_frequency_symbol(polys=self.polys, symbols=self.get_unset_vars())
             for c in self.ff_elements:
-                subs = {g: c}
-                next_subs_node = SubsNode(subs=subs, parent=self.subs_node)
+                subs_copy = self.subs_dict.copy()
+                subs_copy[g] = c
+                old_subs = self.initial_subs_node.full_subs()
+                new_subs = dict()
+                for k, v in subs_copy.items():
+                    if k not in old_subs.keys():
+                        new_subs[k] = v
+                next_subs_node = SubsNode(subs=new_subs, parent=self.subs_node)
                 output.append(SolutionSearchNode(initial_subs_node=next_subs_node, polys=self.polys, parent=self))
         self.spawn = output
 
@@ -429,17 +473,18 @@ class SolutionSearchNode(object):
                 for s_2 in unset_symbols:
                     self._quads.add(s_1 * s_2)
 
-    def _setup_subs(self):
+    def _cleanup_subs_and_symbols(self):
         if self.allow_unset:
-            keys_to_del = [k for k, v in self.subs_dict.items() if v is UNSET_VAR]
-            for k in keys_to_del:
-                del self.subs_dict[k]
+            used_symbols = self.get_symbols_in_polys()
+            output_symbols = list()
+            for g in self.symbols:
+                if g in used_symbols:
+                    output_symbols.append(g)
+                else:
+                    if g not in self.subs_dict:
+                        self.subs_dict[g] = UNSET_VAR
+            self.symbols = output_symbols
 
-    def _cleanup_subs(self):
-        if self.allow_unset:
-            if len(self.polys) == 0:
-                for g in self.get_unset_vars():
-                    self.subs_dict[g] = UNSET_VAR
 
     def _check_unset_vars(self):
         if len(self.get_unset_vars()) == 0:
@@ -473,6 +518,7 @@ class SolutionSearchNode(object):
             self.TERMINAL = True
             return
         modified = self._simplify_polys()
+        self._cleanup_subs_and_symbols()
         if modified:
             self._update_subs_and_polys()
 
@@ -482,10 +528,13 @@ class SolutionSearchNode(object):
         :param specific_subs: dict or None... substitutions to apply to self.polys
         :return: None
         """
+        # The following can lead to hitting a recursion limit!
+        # self.polys = [p.subs(specific_subs) for p in self.polys]
         if specific_subs is not None:
-            self.polys = [p.subs(specific_subs) for p in self.polys]
+            subs_to_apply = specific_subs
         else:
-            self.polys = [p.subs(self.subs_dict) for p in self.polys]
+            subs_to_apply = {k:v for k, v in self.subs_dict.items() if v is not UNSET_VAR}
+        self.polys = [p.subs(subs_to_apply) for p in self.polys]
 
     def _unique_polys(self):
         self.polys = utils.unique_elements(self.polys)

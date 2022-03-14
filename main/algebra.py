@@ -1,5 +1,6 @@
 from collections import Counter
 import numpy as np
+import pickle
 import sympy
 import utils
 import polynomials
@@ -385,6 +386,15 @@ class DGA(DGBase):
             if not lazy_bilin:
                 self.set_all_bilin()
 
+    def pickle(self, file_name):
+        storage = dict()
+        storage['gradings'] = self.gradings
+        storage['augmentations'] = self.augmentations
+        storage['filtration_levels'] = self.filtration_levels
+        storage['bilin_polys'] = self.bilin_polys
+        with open(file_name, 'wb') as f:
+            pickle.dump(storage, f)
+
     def get_verbose_subs_from_aug(self, aug):
         """Extend aug to all generators. This means setting non-zero graded generators to zero.
 
@@ -540,7 +550,7 @@ class DGA(DGBase):
             augmentations = []
             for aug in comm_augmentations:
                 augmentations.append({self.aug_comm_symbols_to_symbols[k]: v for k, v in aug.items()})
-        self.augmentations = augmentations
+        self.augmentations = polynomials.expand_zero_set_from_unset(augmentations, modulus=self.coeff_mod)
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
         self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]

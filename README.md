@@ -58,13 +58,15 @@ Groebner basis computations used to search for augmentations can be very heavy a
 
 ## Features
 
+- During zero_set search... If a variable appears in no polynomials, automatically make it unset. Unpack unset variables.
+- Capping paths is storing too much info. We really only need this for rotation numbers.
 - Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
 - Command line interface would make it easy to run scripts.
 - Way behind on testing...
 - Application is maintaining some variables between requests? I think this is due to mutable function args. Should be solved now.
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
-- Copy knot tables. Have to remember how to translate Sivek front crossing notation to mine.
+- Copy knot tables. To translate Sivek, do (y - 1).
 - UI: Ordering of generators is annoyingly out of place. Should also count numbers of augs.
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Make tables nicer using some JS library. Big tables can be condensed. It would also be nice to sort data.
