@@ -388,12 +388,42 @@ class DGA(DGBase):
 
     def pickle(self, file_name):
         storage = dict()
+        # Required for init
         storage['gradings'] = self.gradings
-        storage['augmentations'] = self.augmentations
+        storage['differentials'] = self.differentials
         storage['filtration_levels'] = self.filtration_levels
         storage['bilin_polys'] = self.bilin_polys
+        storage['coeff_mod'] = self.coeff_mod
+        storage['grading_mod'] = self.grading_mod
+        # Data we want to set up
+        storage['aug_comm_symbols_to_symbols'] = self.aug_comm_symbols_to_symbols
+        storage['aug_symbols_to_comm_symbols'] = self.aug_symbols_to_comm_symbols
+        storage['aug_analysis_table'] = self.aug_analysis_table
+        storage['aug_polys'] = self.aug_polys
+        storage['augmentations'] = self.augmentations
         with open(file_name, 'wb') as f:
             pickle.dump(storage, f)
+
+    @classmethod
+    def from_pickle(cls, file_name):
+        with open(file_name, 'rb') as f:
+            storage = pickle.load(f)
+        dga = DGA(
+            gradings=storage['gradings'],
+            differentials=storage['differentials'],
+            filtration_levels=storage['filtration_levels'],
+            coeff_mod=storage['coeff_mod'],
+            grading_mod=storage['grading_mod'],
+            lazy_augs=True,
+            lazy_bilin=True,
+            lazy_aug_data=True
+        )
+        dga.aug_comm_symbols_to_symbols = storage['aug_comm_symbols_to_symbols']
+        dga.aug_symbols_to_comm_symbols = storage['aug_symbols_to_comm_symbols']
+        dga.aug_analysis_table = storage['aug_analysis_table']
+        dga.aug_polys = storage['aug_polys']
+        dga.augmentations = storage['augmentations']
+        return dga
 
     def get_verbose_subs_from_aug(self, aug):
         """Extend aug to all generators. This means setting non-zero graded generators to zero.

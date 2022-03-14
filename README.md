@@ -26,9 +26,9 @@ When you run `app.py` as above, a URL should appear which you can access from yo
 
 ![image info](./main/static/screenshot.png)
 
-Only use the web interface to compute augmentations for links with small numbers (say, < 30) of crossings. To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
+Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
 
-# Python interface & batch processing
+# Python interface
 
 Computing augmentations of DGAs with large numbers of generators can take hours or be impossible due to memory constraints. Even computing gradings for DGAs can be time consuming.
 
@@ -49,6 +49,22 @@ $ python
 >>> front = [1 for _ in range(21)]
 >>> pd = ll.PlatDiagram(n_strands=4, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=False, lazy_rsft=True)
 ```
+
+It can take a long time to compute augmentations and bilinearized homologies of DGAs. To store a DGA for later analysis, we use the `pickle` functions. Here is an example which assumes we have `pd` as above:
+```
+>>> lch = pd.lch_dga
+>>> lch.pickle('my_favorite_dga.pk')
+```
+Now we can reload the dga with all of its computed data in a new session:
+```
+$ python
+>>> import legendrian_links as ll
+>>> lch = ll.DGA.from_pickle('my_favorite_dga.pk')
+>>> lch.augmentations
+... will show list of all augs ...
+```
+The pickle functionality only stores the data of a DGA, so that we can recover old DGAs even after our code has been updated.
+
 
 # Technical notes on threading and Groebner bases
 

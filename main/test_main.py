@@ -1,11 +1,13 @@
 import json
+import os
+import tempfile
 import unittest
 import numpy as np
 import sympy
 import polynomials
 import utils
+import algebra
 import legendrian_links as ll
-from algebra import Matrix
 
 
 LOG = utils.LOG
@@ -231,11 +233,29 @@ class TestMatrix(unittest.TestCase):
 
     def test_modulus(self):
         self.assertFalse(
-            np.any(Matrix([[4]], coeff_mod=3).values - Matrix([[1]], coeff_mod=3).values)
+            np.any(
+                algebra.Matrix([[4]], coeff_mod=3).values
+                - algebra.Matrix([[1]], coeff_mod=3).values
+            )
         )
         self.assertFalse(
-            np.any(Matrix([[1, 2], [2, 2]], coeff_mod=2).values - Matrix([[1, 0], [0, 0]], coeff_mod=2).values)
+            np.any(
+                algebra.Matrix([[1, 2], [2, 2]], coeff_mod=2).values
+                - algebra.Matrix([[1, 0], [0, 0]], coeff_mod=2).values
+            )
         )
+
+
+class TestDGA(unittest.TestCase):
+
+    def test_pickle(self):
+        pd = ll.PlatDiagram(n_strands=4, front_crossings=[1, 1, 1], lazy_disks=False, lazy_lch=False, lazy_rsft=True)
+        dga = pd.lch_dga
+        with tempfile.TemporaryDirectory() as d:
+            temp_name = os.path.join(d, 'blah.pk')
+            dga.pickle(temp_name)
+            new_dga = algebra.DGA.from_pickle(temp_name)
+        self.assertEqual(dga.augmentations, new_dga.augmentations)
 
 
 if __name__ == '__main__':
