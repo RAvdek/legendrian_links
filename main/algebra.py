@@ -396,6 +396,7 @@ class DGA(DGBase):
         storage['coeff_mod'] = self.coeff_mod
         storage['grading_mod'] = self.grading_mod
         # Data we want to set up
+        storage['_aug_vars_set'] = self._aug_vars_set
         storage['aug_comm_symbols_to_symbols'] = self.aug_comm_symbols_to_symbols
         storage['aug_symbols_to_comm_symbols'] = self.aug_symbols_to_comm_symbols
         storage['aug_analysis_table'] = self.aug_analysis_table
@@ -418,11 +419,12 @@ class DGA(DGBase):
             lazy_bilin=True,
             lazy_aug_data=True
         )
-        dga.aug_comm_symbols_to_symbols = storage['aug_comm_symbols_to_symbols']
-        dga.aug_symbols_to_comm_symbols = storage['aug_symbols_to_comm_symbols']
-        dga.aug_analysis_table = storage['aug_analysis_table']
-        dga.aug_polys = storage['aug_polys']
-        dga.augmentations = storage['augmentations']
+        dga._aug_vars_set = storage.get('_aug_vars_set')
+        dga.aug_comm_symbols_to_symbols = storage.get('aug_comm_symbols_to_symbols')
+        dga.aug_symbols_to_comm_symbols = storage.get('aug_symbols_to_comm_symbols')
+        dga.aug_analysis_table = storage.get('aug_analysis_table')
+        dga.aug_polys = storage.get('aug_polys')
+        dga.augmentations = storage.get('augmentations')
         return dga
 
     def get_verbose_subs_from_aug(self, aug):
