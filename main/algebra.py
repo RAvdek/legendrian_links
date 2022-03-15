@@ -364,9 +364,10 @@ class DGA(DGBase):
             grading_mod=grading_mod
         )
         self.augmentations = None
+        self.augmentations_compressed = None
         self.n_augs = None
-        self.bilin_polys = None
-        self.bilin_polys_dual = None
+        self.bilin_polys = dict()
+        self.bilin_polys_dual = dict()
         self.lazy_aug_data = lazy_aug_data
         self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
@@ -386,7 +387,7 @@ class DGA(DGBase):
             if not lazy_bilin:
                 self.set_all_bilin()
 
-    def pickle(self, file_name):
+    def pickle(self, file_name, compress=True):
         storage = dict()
         # Required for init
         storage['gradings'] = self.gradings
@@ -401,12 +402,16 @@ class DGA(DGBase):
         storage['aug_symbols_to_comm_symbols'] = self.aug_symbols_to_comm_symbols
         storage['aug_analysis_table'] = self.aug_analysis_table
         storage['aug_polys'] = self.aug_polys
-        storage['augmentations'] = self.augmentations
+        storage['augmentations_compressed'] = self.augmentations_compressed
+        if compress:
+            storage['augmentations'] = None
+        else:
+            storage['augmentations'] = self.augmentations
         with open(file_name, 'wb') as f:
             pickle.dump(storage, f)
 
     @classmethod
-    def from_pickle(cls, file_name):
+    def from_pickle(cls, file_name, decompress=False):
         with open(file_name, 'rb') as f:
             storage = pickle.load(f)
         dga = DGA(
@@ -424,7 +429,11 @@ class DGA(DGBase):
         dga.aug_symbols_to_comm_symbols = storage.get('aug_symbols_to_comm_symbols')
         dga.aug_analysis_table = storage.get('aug_analysis_table')
         dga.aug_polys = storage.get('aug_polys')
+        dga.bilin_polys = storage.get('bilin_polys')
+        dga.augmentations_compressed = storage.get('augmentations_compressed')
         dga.augmentations = storage.get('augmentations')
+        if decompress and dga.augmentations is None:
+            dga.decompress_augmentations()
         return dga
 
     def get_verbose_subs_from_aug(self, aug):
@@ -462,8 +471,8 @@ class DGA(DGBase):
                     grading_mod=self.grading_mod,
                     coeff_mod=self.coeff_mod
                 )
-                self.bilin_polys[i][j] = cx.poincare_poly
-                self.bilin_polys_dual[i][j] = cx.poincare_poly_dual
+                self.bilin_polys[(i,j)] = cx.poincare_poly
+                self.bilin_polys_dual[(i,j)] = cx.poincare_poly_dual
                 bilin_counter += 1
                 if bilin_counter % log_frequency == 0:
                     LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
@@ -550,7 +559,7 @@ class DGA(DGBase):
         self._aug_vars_set = True
 
     @utils.log_start_stop
-    def set_augmentations(self, batch_size=None, filtered=False):
+    def set_augmentations(self, batch_size=None, filtered=False, decompress=True):
         # this pattern is bad, because we allow 0 coeff_mod upon instance creation and then this method always runs
         if self.coeff_mod == 0:
             raise ValueError("We cannot search for augmentations over ZZ. It's too difficult :(")
@@ -561,7 +570,7 @@ class DGA(DGBase):
         zero_graded_symbols = list(self.aug_symbols_to_comm_symbols.keys())
         comm_symbols = list(self.aug_symbols_to_comm_symbols.values())
         if len(zero_graded_symbols) == 0:
-            augmentations = []
+            comm_augmentations = []
         else:
             if batch_size is not None:
                 comm_augmentations = polynomials.batch_zero_set(
@@ -577,13 +586,28 @@ class DGA(DGBase):
             else:
                 comm_augmentations = polynomials.zero_set(
                     polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod)
-            # comm_augs will be a list of dicts whose keys are the commutative symbols.
-            # We need to switch them back!
-            augmentations = []
-            for aug in comm_augmentations:
-                augmentations.append({self.aug_comm_symbols_to_symbols[k]: v for k, v in aug.items()})
-        self.augmentations = polynomials.expand_zero_set_from_unset(augmentations, modulus=self.coeff_mod)
+        self.augmentations_compressed = comm_augmentations
+        LOG.info(f"Found {len(self.augmentations_compressed)} compressed augmentations of DGA")
+        if decompress:
+            self.decompress_augmentations()
+
+    def get_decompressed_augmentations(self, start_i=None, end_i=None):
+        if start_i is None:
+            start_i = 0
+        if end_i is None:
+            end_i = len(self.augmentations_compressed)
+        augs_compressed = self.augmentations_compressed[start_i:end_i]
+        LOG.info(augs_compressed)
+        augmentations = []
+        comm_augmentations = polynomials.expand_zero_set_from_unset(augs_compressed, modulus=self.coeff_mod)
+        for aug in comm_augmentations:
+            augmentations.append({self.aug_comm_symbols_to_symbols[k]: v for k, v in aug.items()})
+        return augmentations
+
+    @utils.log_start_stop
+    def decompress_augmentations(self):
+        # comm_augs will be a list of dicts whose keys are the commutative symbols.
+        # We need to switch them back!
+        self.augmentations = self.get_decompressed_augmentations()
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
-        self.bilin_polys = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]
-        self.bilin_polys_dual = [[None for _ in range(self.n_augs)] for _ in range(self.n_augs)]

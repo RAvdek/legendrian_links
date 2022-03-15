@@ -18,7 +18,6 @@ dga = pd.rsft_dga
 dga.pickle(PK_NAME)
 LOG.info("Pickling after set_aug_data")
 dga.pickle(PK_NAME)
-dga.set_augmentations()
+dga.set_augmentations(decompress=False)
 LOG.info("Pickling after set_augmentations")
 dga.pickle(PK_NAME)
-dga.set_all_bilin()

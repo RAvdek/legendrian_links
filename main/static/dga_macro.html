@@ -7,7 +7,7 @@ Poincare polynomials for {{ ctx["name"] }} augmentations
   </tr>
   {% for i in range(ctx["n_augs"]) %}
   <tr>
-    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys"][i][j] }}</th>{% endfor %}
+    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys"][(i,j)] }}</th>{% endfor %}
   </tr>
   {% endfor %}
 </table>
@@ -20,7 +20,7 @@ Dual Poincare polynomials for {{ ctx["name"] }} augmentations
   </tr>
   {% for i in range(ctx["n_augs"]) %}
   <tr>
-    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys_dual"][i][j] }}</th>{% endfor %}
+    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys_dual"][(i,j)] }}</th>{% endfor %}
   </tr>
   {% endfor %}
 </table>

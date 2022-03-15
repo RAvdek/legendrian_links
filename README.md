@@ -96,7 +96,7 @@ I cannot guarantee that this is not a bad idea!
 
 ## Features
 
-- It seems that solving linear equations is the biggest waste of time, but these are the easiest to solve!
+- How do we more efficiently store augmentations? Maybe as `SubsNode`s? Currently it appears that compressed augs can expand enormously.
 - Capping paths is storing too much info. We really only need this for rotation numbers.
 - Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
 - Command line interface would make it easy to run scripts.
