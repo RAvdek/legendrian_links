@@ -15,7 +15,7 @@ LOG = utils.LOG
 
 def comparable_list_of_dicts(l):
     # Have to convert to sets of json strings as we cannot make sets of dicts in TestCase.AssertEqual
-    return sorted([json.dumps({str(k): v for k, v in d.items()}, sort_keys=True) for d in l])
+    return sorted([json.dumps({str(k): str(v) for k, v in d.items()}, sort_keys=True) for d in l])
 
 
 class TestLinks(unittest.TestCase):
@@ -119,6 +119,20 @@ class TestZeroSet(unittest.TestCase):
         self.a, self.b, self.c = sympy.symbols('a,b,c')
         self.symbols = [self.a, self.b, self.c]
 
+    def test_is_linear(self):
+        self.assertTrue(polynomials.is_linear(0))
+        self.assertFalse(polynomials.is_linear(1 + self.a))
+        self.assertTrue(polynomials.is_linear(self.a + self.b))
+        self.assertFalse(polynomials.is_linear(1 + self.a + self.b))
+        self.assertFalse(polynomials.is_linear(self.a * self.b))
+
+    def test_is_affine(self):
+        self.assertTrue(polynomials.is_affine(0))
+        self.assertTrue(polynomials.is_affine(1 + self.a))
+        self.assertTrue(polynomials.is_affine(self.a + self.b))
+        self.assertTrue(polynomials.is_affine(1 + self.a + self.b))
+        self.assertFalse(polynomials.is_affine(self.a * self.b))
+
     def test_poly_symbols(self):
         z = sympy.Poly(1 + self.a * self.b * self.c, *self.symbols)
         self.assertEqual(polynomials.poly_symbols(z), set(self.symbols))
@@ -147,6 +161,16 @@ class TestZeroSet(unittest.TestCase):
         expected = [{'a': 1, 'b': 0}, {'a': 1, 'b': 1}]
         self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
 
+        z = [{self.a: 1, self.b: self.a}]
+        output = polynomials.expand_zero_set_from_unset(z, 2)
+        expected = [{self.a: 1, self.b: 1}]
+        self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
+
+        z = [{self.a: 1, self.b: self.a, self.c: self.b}]
+        output = polynomials.expand_zero_set_from_unset(z, 2)
+        expected = [{self.a: 1, self.b: 1, self.c: 1}]
+        self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
+
     def test_non_zero_const(self):
         polys = [1]
         output = polynomials.zero_set(polys=polys, symbols=self.symbols)
@@ -162,12 +186,12 @@ class TestZeroSet(unittest.TestCase):
     def test_quad(self):
         polys = [1 + self.a*self.b]
         expected_output = [{self.a: 1, self.b: 1}]
-        output = polynomials.zero_set(polys=polys, symbols=[self.a, self.b], allow_unset=False)
-        self.assertEqual(expected_output, output)
+        results = polynomials.zero_set(polys=polys, symbols=[self.a, self.b], allow_unset=False)
+        self.assertEqual(expected_output, results)
 
         expected_output = [{self.a: 1, self.b: 1, self.c: polynomials.UNSET_VAR}]
-        output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=True)
-        self.assertEqual(comparable_list_of_dicts(expected_output), comparable_list_of_dicts(output))
+        results = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=True)
+        self.assertEqual(comparable_list_of_dicts(expected_output), comparable_list_of_dicts(results))
 
     def test_deg_three(self):
         polys = [1 + self.a * self.b * self.c]
@@ -178,6 +202,7 @@ class TestZeroSet(unittest.TestCase):
     def test_trefoil(self):
         polys = [1 + self.a + self.c + self.a * self.b * self.c]
         results = polynomials.zero_set(polys=polys, symbols=self.symbols, modulus=2)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         expected_results = [
             {self.a: 0, self.c: 1, self.b: 0},
             {self.a: 0, self.c: 1, self.b: 1},
@@ -192,7 +217,7 @@ class TestZeroSet(unittest.TestCase):
         polys = [1 + self.a + e + (self.a * self.b * self.c * d * e)]
         symbols = self.symbols + [d, e]
         results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2, allow_unset=False)
-        LOG.info(results)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         self.assertEqual(len(results), 17)
 
     def test_fivefold_plus_linear(self):
@@ -200,27 +225,28 @@ class TestZeroSet(unittest.TestCase):
         polys = [1 + self.a + e + (self.a * self.b * self.c * d * e), self.a]
         symbols = self.symbols + [d, e]
         results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2, allow_unset=False)
-        LOG.info(results)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         self.assertEqual(len(results), 8)
 
         polys = [1 + self.a + e + (self.a * self.b * self.c * d * e), self.a + 1]
         results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2, allow_unset=False)
-        LOG.info(results)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         self.assertEqual(len(results), 9)
 
         polys = [1 + self.a + e + (self.a * self.b * self.c * d * e), self.a + 1, e]
         results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2, allow_unset=False)
-        LOG.info(results)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         self.assertEqual(len(results), 8)
 
         polys = [1 + self.a + e + (self.a * self.b * self.c * d * e), self.a + 1, e + 1]
         results = polynomials.zero_set(polys=polys, symbols=symbols, modulus=2, allow_unset=False)
-        LOG.info(results)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         self.assertEqual(len(results), 1)
 
     def test_hopf_link(self):
         polys = [self.a * self.b]
         results = polynomials.zero_set(polys=polys, symbols=[self.a, self.b], modulus=2)
+        results = polynomials.expand_zero_set_from_unset(results, modulus=2)
         expected_results = [
             {self.a: 1, self.b: 0},
             {self.a: 0, self.b: 0},
