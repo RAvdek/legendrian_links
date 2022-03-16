@@ -366,6 +366,7 @@ class DGA(DGBase):
         self.augmentations = None
         self.augmentations_compressed = None
         self.n_augs = None
+        self.n_augs_compressed = None
         self.bilin_polys = dict()
         self.bilin_polys_dual = dict()
         self.lazy_aug_data = lazy_aug_data
@@ -587,9 +588,13 @@ class DGA(DGBase):
                 comm_augmentations = polynomials.zero_set(
                     polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod)
         self.augmentations_compressed = comm_augmentations
-        LOG.info(f"Found {len(self.augmentations_compressed)} compressed augmentations of DGA")
+        self.n_augs_compressed = len(self.augmentations_compressed)
+        LOG.info(f"Found {self.n_augs_compressed} compressed augmentations of DGA")
         if decompress:
             self.decompress_augmentations()
+        else:
+            self._set_n_augs_from_compressed()
+            LOG.info(f"Found {self.n_augs} (uncompressed) augmentations of DGA")
 
     def get_decompressed_augmentations(self, start_i=None, end_i=None):
         if start_i is None:
@@ -611,3 +616,10 @@ class DGA(DGBase):
         self.augmentations = self.get_decompressed_augmentations()
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
+
+    def _set_n_augs_from_compressed(self):
+        count = 0
+        for aug_c in self.augmentations_compressed:
+            n_unset_vars = len([k for k, v in aug_c.items() if v is polynomials.UNSET_VAR])
+            count += self.coeff_mod ** n_unset_vars
+        self.n_augs = count

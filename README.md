@@ -22,11 +22,15 @@ You may need to modify the version of python in Pipfile so that this is compatib
 
 # Web interface
 
-When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&auto_dgas=rsft`, giving a [polyfillable link](https://arxiv.org/abs/1307.7998):
+When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. The `crossings` parameter gives a plat presentation of the link in the front projection, with crossing indices ranging from 0 to `n_strands` - 2, ordered from left to right.
+
+Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&auto_dgas=rsft`, giving a [polyfillable link](https://arxiv.org/abs/1307.7998):
 
 ![image info](./main/static/screenshot.png)
 
-Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
+Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). You can monitor the terminal to see what computations are happening. For small numbers of crossings, computations of bilinearized Poincare polynomials may still take a while.
+
+To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
 
 # Python interface
 
@@ -64,6 +68,23 @@ $ python
 ... will show list of all augs ...
 ```
 The pickle functionality only stores the data of a DGA, so that we can recover old DGAs even after our code has been updated.
+
+It's often the case that the number of augmentations is too large to be stored in memory by any computer (eg. 2**100). If the number of augmentations is very large, they can still be computed and stored using ``compressed representations''. In the following example, we'll see that there are a small number of augmentations, meaning it is ok to ``decompress'' them to usual augmentations.
+```
+$ python
+>>> import legendrian_links as ll
+>>> front = [1 for _ in range(5)]
+>>> pd = ll.PlatDiagram(n_strands=4, front_crossings=front, n_copy=1, lazy_disks=False, lazy_lch=True, lazy_rsft=True)
+>>> pd.set_lch(lazy_augs=True, lazy_bilin=True)
+>>> pd.lch_dga.set_augmentations(decompress=False)
+2022-03-16 10:09:56,784|utils|INFO|Starting execution set_augmentations
+...
+2022-03-16 10:11:02,702|utils|INFO|Found 8 compressed augmentations of DGA
+2022-03-16 10:11:02,702|utils|INFO|Found 21 (uncompressed) augmentations of DGA
+2022-03-16 10:11:02,702|utils|INFO|Ending execution set_augmentations
+>>> pd.lch_dga.decompress_augmentations()
+```
+Now we can proceed with computing bilinearized homologies, etc. We're working on more functionality to deal with large numbers of augmentations.
 
 # Technical notes
 
