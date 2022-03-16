@@ -1,6 +1,10 @@
 {% macro dga(ctx) -%}
 {% if ctx["has_augs"] %}
-Poincare polynomials for {{ ctx["name"] }} augmentations
+Poincare polynomials for {{ ctx["name"] }} augmentations:
+<ul>
+  <li>Linearized: {% for p in ctx["lin_poly_list"] %}{{ p }}{% if not loop.last %}, {% endif %}{% endfor %}</li>
+  <li>Biinearized: {% for p in ctx["bilin_poly_list"] %}{{ p }}{% if not loop.last %}, {% endif %}{% endfor %}</li>
+</ul>
 <table>
   <tr>
     <th>Aug indices</th>{% for j in range(ctx["n_augs"]) %}<th>{{ j }}</th>{% endfor %}

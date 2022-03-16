@@ -279,8 +279,8 @@ class TestDGA(unittest.TestCase):
         dga = pd.lch_dga
         with tempfile.TemporaryDirectory() as d:
             temp_name = os.path.join(d, 'blah.pk')
-            dga.pickle(temp_name)
-            new_dga = algebra.DGA.from_pickle(temp_name)
+            dga.pickle(temp_name, compress=False)
+            new_dga = algebra.DGA.from_pickle(temp_name, decompress=True)
         self.assertEqual(dga.augmentations, new_dga.augmentations)
 
 

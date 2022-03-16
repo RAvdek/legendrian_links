@@ -143,5 +143,10 @@
     "front_crossings": [3,2,1,4,4,3,2,2,5,4,3,2,1,6,5,4,4,3,7,6,5,4,4,3,5,8,7,7],
     "n_strands": 10,
     "comment": "slice from lch.sage"
+  },
+  "m8_21":{
+    "front_crossings": [1,1,3,3,2,2,1,3],
+    "n_strands": 6,
+    "comment": "K_2 from https://arxiv.org/pdf/math/0411206.pdf"
   }
 }

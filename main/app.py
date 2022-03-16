@@ -109,6 +109,8 @@ def get_dga_context(dga, name):
         for g in dga.symbols
     ]
     generators = sorted(generators, key=lambda g: g["name"])
+    output["lin_poly_list"] = dga.lin_poly_list
+    output["bilin_poly_list"] = dga.bilin_poly_list
     output["generators"] = generators
     output["n_augs"] = len(dga.augmentations)
     output["has_augs"] = len(dga.augmentations) > 0
@@ -148,10 +150,20 @@ def home():
         lazy_disks_flag = request.args.get('lazy_disks')
         if lazy_disks_flag is not None:
             lazy_disks = lazy_disks_flag.lower() == 'true'
+        mirror = False
+        mirror_flag = request.args.get('mirror')
+        if mirror_flag is not None:
+            mirror = mirror_flag.lower() == 'true'
+        orientation_flips = None
+        orientations = request.args.get('orientation_flips')
+        if orientations is not None:
+            orientation_flips = [x.lower() == 'true' for x in orientations.split(',')]
         pd = ll.PlatDiagram(
             n_strands=n_strands,
             front_crossings=crossings,
             n_copy=n_copy,
+            mirror=mirror,
+            orientation_flips=orientation_flips,
             lazy_disks=lazy_disks,
             lazy_lch=lazy_lch,
             lazy_rsft=lazy_rsft,

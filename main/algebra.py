@@ -369,6 +369,8 @@ class DGA(DGBase):
         self.n_augs_compressed = None
         self.bilin_polys = dict()
         self.bilin_polys_dual = dict()
+        self.lin_poly_list = None
+        self.bilin_poly_list = None
         self.lazy_aug_data = lazy_aug_data
         self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
@@ -395,6 +397,8 @@ class DGA(DGBase):
         storage['differentials'] = self.differentials
         storage['filtration_levels'] = self.filtration_levels
         storage['bilin_polys'] = self.bilin_polys
+        storage['lin_poly_list'] = self.lin_poly_list
+        storage['bilin_poly_list'] = self.bilin_poly_list
         storage['coeff_mod'] = self.coeff_mod
         storage['grading_mod'] = self.grading_mod
         # Data we want to set up
@@ -431,6 +435,8 @@ class DGA(DGBase):
         dga.aug_analysis_table = storage.get('aug_analysis_table')
         dga.aug_polys = storage.get('aug_polys')
         dga.bilin_polys = storage.get('bilin_polys')
+        dga.lin_poly_list = storage.get('lin_poly_list')
+        dga.bilin_poly_list = storage.get('bilin_poly_list')
         dga.augmentations_compressed = storage.get('augmentations_compressed')
         dga.augmentations = storage.get('augmentations')
         if decompress and dga.augmentations is None:
@@ -459,7 +465,6 @@ class DGA(DGBase):
     @utils.log_start_stop
     def set_all_bilin(self):
         # How frequently to log?
-        log_frequency = 20
         bilin_counter = 0
         for i in range(self.n_augs):
             for j in range(self.n_augs):
@@ -475,8 +480,15 @@ class DGA(DGBase):
                 self.bilin_polys[(i,j)] = cx.poincare_poly
                 self.bilin_polys_dual[(i,j)] = cx.poincare_poly_dual
                 bilin_counter += 1
-                if bilin_counter % log_frequency == 0:
-                    LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
+                LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
+        self.lin_poly_list = sorted(
+            utils.unique_elements([v for k, v in self.bilin_polys.items() if k[0] == k[1]]),
+            key=str
+        )
+        self.bilin_poly_list = sorted(
+            utils.unique_elements(self.bilin_polys.values()),
+            key=str
+        )
 
     def are_homotopy_equivalent(self, aug_1, aug_2):
         """The augmentations are homotopy equivalent iff the induced map on bilinearized homology to the base field
@@ -602,7 +614,6 @@ class DGA(DGBase):
         if end_i is None:
             end_i = len(self.augmentations_compressed)
         augs_compressed = self.augmentations_compressed[start_i:end_i]
-        LOG.info(augs_compressed)
         augmentations = []
         comm_augmentations = polynomials.expand_zero_set_from_unset(augs_compressed, modulus=self.coeff_mod)
         for aug in comm_augmentations:

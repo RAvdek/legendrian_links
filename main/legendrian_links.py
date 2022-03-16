@@ -486,14 +486,18 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, lazy_disks=False, lazy_lch=True, lazy_rsft=True):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False, lazy_lch=True, lazy_rsft=True):
         self.n_strands = n_strands
-        self.front_crossings = front_crossings
+        if mirror:
+            self.front_crossings = list(reversed(front_crossings))
+        else:
+            self.front_crossings = front_crossings
         self.n_copy = n_copy
+        self.orientation_flips = orientation_flips
         self.lazy_disks = lazy_disks
         self.lazy_lch = lazy_lch
         self.lazy_rsft = lazy_rsft
-        LOG.info(f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, "
+        LOG.info(f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, mirror={mirror}"
                  f"n_copy={n_copy}, lazy_disks={lazy_disks}, lazy_lch={lazy_lch}, lazy_rsft={lazy_rsft})")
 
         if lazy_disks and ((not lazy_lch) or (not lazy_rsft)):
@@ -733,8 +737,6 @@ class PlatDiagram(object):
 
     def _label_line_segments(self):
         knot_label = 0
-        # The while loops are in danger of being infinite. Cut at an n to debug.
-        n = 0
         while True:
             unlabeled_line_segments = [ls for ls in self.line_segments if ls.knot_label is None]
             n_unlabeled_line_segments = len(unlabeled_line_segments)
@@ -742,11 +744,15 @@ class PlatDiagram(object):
                 break
             initial_ls = unlabeled_line_segments[0]
             initial_ls.set_knot_label(knot_label)
-            initial_ls.set_orientation('r')
+            left_right = 'r'
+            if self.orientation_flips is not None:
+                flip_flag = self.orientation_flips[knot_label]
+                if flip_flag:
+                    left_right = 'l'
+            initial_ls.set_orientation(left_right)
             ls = self._label_next_line_segment(initial_ls)
             while ls != initial_ls:
                 ls = self._label_next_line_segment(ls)
-                n += 1
             knot_label += 1
         self.n_components = len(set([ls.knot_label for ls in self.line_segments]))
         # add a t label to exactly one line segment in each component of the link

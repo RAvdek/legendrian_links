@@ -118,10 +118,10 @@ def zero_set(
         output = [node.subs_node.full_subs() for node in solution_nodes]
         n_unique = len(utils.unique_elements(output))
         if n_unique != len(output):
-            raise RuntimeError(f"Augs are not unique! n_unique={n_unique}, n={len(output)}")
-        LOG.info(f"Statistics: {dict(counter)}")
+            raise RuntimeError(f"zero_set augs are not unique! n_unique={n_unique}, n={len(output)}")
+        LOG.info(f"zero_set search statistics: {dict(counter)}")
     except KeyboardInterrupt as e:
-        LOG.info(f"Statistics: {dict(counter)}")
+        LOG.info(f"zero_set search statistics: {dict(counter)}")
         raise e
     return output
 
