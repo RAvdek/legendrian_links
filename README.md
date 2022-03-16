@@ -1,8 +1,8 @@
 # Legendrian links
 
-An interactive application for analyzing Legendrian links. Or it will be some day, maybe.
+An interactive application for analyzing Legendrian links.
 
-Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
+Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra and be able to handle heavy computations. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
 
 The program computes augmentations of LCH algebras as well as for a version of Legendrian RSFT (which is not on the arXiv yet). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
 
@@ -40,7 +40,7 @@ Run the following code from inside the `main/` folder to setup the `PlatDiagram`
 ```
 $ python
 >>> import legendrian_links as ll
->>> front = [1 for _ in range(21)]
+>>> front = [1 for _ in range(5)]
 >>> pd = ll.PlatDiagram(n_strands=4, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=True, lazy_rsft=True)
 >>> pd.set_lch(lazy_augs=True, lazy_bilin=True)
 >>> pd.lch_dga.set_augmentations()
@@ -50,7 +50,7 @@ The `lazy...` options can prevent the kick-off of some potentially heavy computa
 ```
 $ python
 >>> import legendrian_links as ll
->>> front = [1 for _ in range(21)]
+>>> front = [1 for _ in range(5)]
 >>> pd = ll.PlatDiagram(n_strands=4, front_crossings=front, n_copy=2, lazy_disks=False, lazy_lch=False, lazy_rsft=True)
 ```
 
@@ -69,7 +69,7 @@ $ python
 ```
 The pickle functionality only stores the data of a DGA, so that we can recover old DGAs even after our code has been updated.
 
-It's often the case that the number of augmentations is too large to be stored in memory by any computer (eg. 2**100). If the number of augmentations is very large, they can still be computed and stored using ``compressed representations''. In the following example, we'll see that there are a small number of augmentations, meaning it is ok to ``decompress'' them to usual augmentations.
+It's often the case that the number of augmentations is too large to be stored in memory by any computer (eg. 2**100). If the number of augmentations is very large, they can still be computed and stored using "compressed representations". In the following example, we'll see that there are a small number of augmentations, meaning it is ok to "decompress" them to usual augmentations.
 ```
 $ python
 >>> import legendrian_links as ll
@@ -125,15 +125,14 @@ I cannot guarantee that this is not a bad idea!
 - Application is maintaining some variables between requests? I think this is due to mutable function args. Should be solved now.
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
-- Copy knot tables. To translate Sivek, do (y - 1).
+- Copy knot tables.
 - UI: Ordering of generators is annoyingly out of place. Should also count numbers of augs.
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Make tables nicer using some JS library. Big tables can be condensed. It would also be nice to sort data.
 - Introduce t coordinate in differentials. (This is not so important for augmentations where we can use t=1 for Z/2Z coeffs).
 - Ability to flip orientations of link components. Currently upper-left corner always points right.
-- Ability to reverse orientations on link components.
 - Orientations: Process disks into differentials for LCH with Z coefficients.
-- Carry out orientation processing for RSFT differentials.
+- Carry out orientation processing for RSFT differentials. This requires theoretical work.
 - Algorithmically determine a plat diagram from a grid diagram.
 - Compute differentials for 2-copies and twisted 2-copies.
 - In the we interface, users can do basic input links, flip components, etc with HTML / javascript input.
