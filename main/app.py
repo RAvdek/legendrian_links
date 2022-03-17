@@ -1,3 +1,4 @@
+# coding=utf-8
 import os
 from flask import (
     Flask,
@@ -30,8 +31,8 @@ KNOT_COLORS = [
     (128, 128, 0)
 ]
 KNOT_ORIENTATIONS_TO_ARROW = {
-    'l': '<',
-    'r': '>'
+    'l': '⏪',
+    'r': '⏩'
 }
 
 

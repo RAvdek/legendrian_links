@@ -9,25 +9,35 @@ GROEBNER_TIMEOUT_DEFAULT = .1
 UNSET_VAR = None
 
 
-def expand_zero_set_from_unset(zeros, modulus=2):
+def expand_zero_set_from_unset(zeros, fill_na=None, modulus=2):
     ff_elements = finite_field_elements(modulus)
     output = list()
     # Fill in the UNSET_VAR
-    for z in zeros:
-        to_process = [z]
-        while len(to_process) > 0:
-            p = to_process.pop()
-            if any([v is UNSET_VAR for v in p.values()]):
-                new_ps = [p.copy() for _ in ff_elements]
-                to_modify = None
-                for k, v in p.items():
-                    if v is UNSET_VAR:
-                        to_modify = k
-                for i in ff_elements:
-                    new_ps[i][to_modify] = i
-                to_process += new_ps
-            else:
-                output.append(p)
+    if fill_na is None:
+        for z in zeros:
+            to_process = [z]
+            while len(to_process) > 0:
+                p = to_process.pop()
+                if any([v is UNSET_VAR for v in p.values()]):
+                    new_ps = [p.copy() for _ in ff_elements]
+                    to_modify = None
+                    for k, v in p.items():
+                        if v is UNSET_VAR:
+                            to_modify = k
+                    for i in ff_elements:
+                        new_ps[i][to_modify] = i
+                    to_process += new_ps
+                else:
+                    output.append(p)
+    else:
+        if fill_na not in finite_field_elements(modulus=modulus):
+            raise ValueError(f"Attempting to fill_na with {fill_na} not in Z/{modulus}Z")
+        for z in zeros:
+            z_filled = {
+                k: v if v is not UNSET_VAR else fill_na
+                for k, v in z.items()
+            }
+            output.append(z_filled)
     # Fill in any affine equations
     zeros = output.copy()
     output = []

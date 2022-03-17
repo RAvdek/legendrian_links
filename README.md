@@ -117,6 +117,8 @@ I cannot guarantee that this is not a bad idea!
 
 ## Features
 
+- Compute spectral sequence polynomials to improve poincare polynomials.
+- Tools for decompressing augmentations. We want to control the order of augmentations so that we can track them by indices.
 - How do we more efficiently store augmentations? Maybe as `SubsNode`s? Currently it appears that compressed augs can expand enormously.
 - Capping paths is storing too much info. We really only need this for rotation numbers.
 - Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
@@ -130,7 +132,6 @@ I cannot guarantee that this is not a bad idea!
 - Check if two augmentations are homotopic or not, by seeing if the bilinearized homology has non-zero hom to the base field.
 - Make tables nicer using some JS library. Big tables can be condensed. It would also be nice to sort data.
 - Introduce t coordinate in differentials. (This is not so important for augmentations where we can use t=1 for Z/2Z coeffs).
-- Ability to flip orientations of link components. Currently upper-left corner always points right.
 - Orientations: Process disks into differentials for LCH with Z coefficients.
 - Carry out orientation processing for RSFT differentials. This requires theoretical work.
 - Algorithmically determine a plat diagram from a grid diagram.

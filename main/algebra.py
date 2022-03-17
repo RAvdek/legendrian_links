@@ -6,6 +6,7 @@ import utils
 import polynomials
 
 LOG = utils.LOG
+POINCARE_POLY_VAR = sympy.Symbol('t')
 
 
 class Differential(object):
@@ -27,8 +28,7 @@ class Differential(object):
         return self.bilinearize(subs, subs)
 
     def bilinearize(self, subs_1, subs_2):
-        """Return bilinearized differential should use expression.args to capture monomials and then .args again to get
-        individual terms"""
+        """Return bilinearized differential using substitutions"""
         poly = sympy.sympify(self.expression)
         output = 0
         if not poly.is_number:
@@ -59,7 +59,7 @@ class Matrix(object):
     n_cols:
     coeff_mod: Consider as matrix with coeffs modulus this number
     ref: Row echelon form
-    ref_q: Matrix q such that q*ref = self
+    ref_q: Matrix such that ref_q * ref = self
     ref_q_inv: Inverse of ref_q
     rank_im: Dimension of the image
     rank_ker: Dimension of the kernel
@@ -232,9 +232,9 @@ class DGBase(object):
         self.gradings = gradings
         self.symbols = self.gradings.keys()
         self.differentials = differentials
+        self.filtration_levels = filtration_levels
         self.coeff_mod = coeff_mod
         self.grading_mod = grading_mod
-        self.filtration_levels = filtration_levels
         self._verify_init_args()
         self._correct_gradings()
         self._correct_filtration_levels()
@@ -339,15 +339,14 @@ class ChainComplex(DGBase):
                 output_dual_dict[i] -= rank_im_dual
             else:
                 output_dual_dict[i] = -rank_im_dual
-        t = sympy.Symbol('t')
         # poincare poly
         output = 0
         for i in output_dict.keys():
-            output += output_dict[i] * (t ** i)
+            output += output_dict[i] * (POINCARE_POLY_VAR ** i)
         # dual poly
         output_dual = 0
         for i in output_dual_dict.keys():
-            output_dual += output_dual_dict[i] * (t ** i)
+            output_dual += output_dual_dict[i] * (POINCARE_POLY_VAR ** i)
         self.poincare_poly = output
         self.poincare_poly_dual = output_dual
 
@@ -608,23 +607,27 @@ class DGA(DGBase):
             self._set_n_augs_from_compressed()
             LOG.info(f"Found {self.n_augs} (uncompressed) augmentations of DGA")
 
-    def get_decompressed_augmentations(self, start_i=None, end_i=None):
+    def get_decompressed_augmentations(self, start_i=None, end_i=None, fill_na=None):
+        if fill_na is not None:
+            LOG.info(f"Working with a subset of augmentations using default value {fill_na}")
         if start_i is None:
             start_i = 0
         if end_i is None:
             end_i = len(self.augmentations_compressed)
         augs_compressed = self.augmentations_compressed[start_i:end_i]
         augmentations = []
-        comm_augmentations = polynomials.expand_zero_set_from_unset(augs_compressed, modulus=self.coeff_mod)
+        comm_augmentations = polynomials.expand_zero_set_from_unset(
+            augs_compressed, modulus=self.coeff_mod, fill_na=fill_na
+        )
         for aug in comm_augmentations:
             augmentations.append({self.aug_comm_symbols_to_symbols[k]: v for k, v in aug.items()})
         return augmentations
 
     @utils.log_start_stop
-    def decompress_augmentations(self):
+    def decompress_augmentations(self, fill_na=None):
         # comm_augs will be a list of dicts whose keys are the commutative symbols.
         # We need to switch them back!
-        self.augmentations = self.get_decompressed_augmentations()
+        self.augmentations = self.get_decompressed_augmentations(fill_na)
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
 
