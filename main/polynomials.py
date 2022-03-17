@@ -10,6 +10,7 @@ UNSET_VAR = None
 
 
 def expand_zero_set_from_unset(zeros, modulus=2, fill_na=None):
+    LOG.info(f"Expanding {len(zeros)} with modulus={modulus} and fill_na={fill_na}")
     ff_elements = finite_field_elements(modulus)
     output = list()
     # Fill in the UNSET_VAR
@@ -30,7 +31,7 @@ def expand_zero_set_from_unset(zeros, modulus=2, fill_na=None):
                 else:
                     output.append(p)
     else:
-        if fill_na not in finite_field_elements(modulus=modulus):
+        if fill_na not in ff_elements:
             raise ValueError(f"Attempting to fill_na with {fill_na} not in Z/{modulus}Z")
         for z in zeros:
             z_filled = {
@@ -38,9 +39,11 @@ def expand_zero_set_from_unset(zeros, modulus=2, fill_na=None):
                 for k, v in z.items()
             }
             output.append(z_filled)
+    LOG.info(f"Filled NAs to produce {len(output)} zeros")
     # Fill in any affine equations
     zeros = output.copy()
     output = []
+    z_counter = 0
     for z in zeros:
         subs = {k: sympy.sympify(v) for k, v in z.items()}
         while not all([v.is_number for v in subs.values()]):
@@ -49,6 +52,8 @@ def expand_zero_set_from_unset(zeros, modulus=2, fill_na=None):
             for k in [k for k in subs_copy.keys() if k not in subs_copy_clean.keys()]:
                 subs[k] = subs_copy[k].subs(subs_copy_clean)
         output.append(subs)
+        z_counter += 1
+        LOG.info(f"Completed expansion of {z_counter} zeros")
     return output
 
 

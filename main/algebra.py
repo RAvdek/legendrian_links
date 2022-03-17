@@ -627,7 +627,7 @@ class DGA(DGBase):
     def decompress_augmentations(self, fill_na=None):
         # comm_augs will be a list of dicts whose keys are the commutative symbols.
         # We need to switch them back!
-        self.augmentations = self.get_decompressed_augmentations(fill_na)
+        self.augmentations = self.get_decompressed_augmentations(fill_na=fill_na)
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")
 
