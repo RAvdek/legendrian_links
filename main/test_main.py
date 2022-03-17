@@ -171,6 +171,21 @@ class TestZeroSet(unittest.TestCase):
         expected = [{self.a: 1, self.b: 1, self.c: 1}]
         self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
 
+        z = [{'a': 1, 'b': polynomials.UNSET_VAR}]
+        output = polynomials.expand_zero_set_from_unset(z, modulus=2, fill_na=0)
+        expected = [{'a': 1, 'b': 0}]
+        self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
+
+        z = [{'a': 1, 'b': polynomials.UNSET_VAR}]
+        output = polynomials.expand_zero_set_from_unset(z, modulus=2, fill_na=1)
+        expected = [{'a': 1, 'b': 1}]
+        self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
+
+        z = [{self.a: polynomials.UNSET_VAR, self.b: self.a, self.c: self.b}]
+        output = polynomials.expand_zero_set_from_unset(z, modulus=2, fill_na=0)
+        expected = [{self.a: 0, self.b: 0, self.c: 0}]
+        self.assertEqual(comparable_list_of_dicts(output), comparable_list_of_dicts(expected))
+
     def test_non_zero_const(self):
         polys = [1]
         output = polynomials.zero_set(polys=polys, symbols=self.symbols)

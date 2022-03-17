@@ -9,7 +9,7 @@ GROEBNER_TIMEOUT_DEFAULT = .1
 UNSET_VAR = None
 
 
-def expand_zero_set_from_unset(zeros, fill_na=None, modulus=2):
+def expand_zero_set_from_unset(zeros, modulus=2, fill_na=None):
     ff_elements = finite_field_elements(modulus)
     output = list()
     # Fill in the UNSET_VAR
