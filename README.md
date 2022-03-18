@@ -28,6 +28,15 @@ Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1
 
 ![image info](./main/static/screenshot.png)
 
+Here is a complete list of url arguments:
+- `n_strands`: How many strands of the plat? Must be a positive even integer.
+- `crossings`: Crossings of the plat in the front projection. This will be resolved using Lagrangian resolution.
+- `lazy_disks`: True or False. If True, just print the plat diagram and list the chords.
+- `auto_dgas`: `lch`, `rsft`, or both (`lch,rsft`). Which DGAs should we analyze?
+- `mirror`: If True, reverse order of the the front_crossings.
+- `orientation_flips`: Comma separated list of True/False. Will change the orientations of the link components.
+- `aug_fill_na`: 0 or 1 if used. Use only is there are many augmentations. Augmentations will always be computed with some variables set to `None` (meaning that they could take on any value, 0 or 1). If `aug_fill_na` is not None, we use this number to fill in these values.
+
 Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). You can monitor the terminal to see what computations are happening. For small numbers of crossings, computations of bilinearized Poincare polynomials may still take a while.
 
 To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
@@ -46,7 +55,7 @@ $ python
 >>> pd.lch_dga.set_augmentations()
 >>> pd.lch_dga.set_all_bilin()
 ```
-The `lazy...` options can prevent the kick-off of some potentially heavy computations. Some experimental options for `set_augmentations` are trying to help speed up computations (see the code). We can also fun the above with less commands:
+The `lazy...` options can prevent the kick-off of some potentially heavy computations. All of the URL arguments have counterparts for the python interface's initialization of `ll.PlatDiagram`. We'll improve documentation at some point, but for now, check out the code. Some experimental options for `set_augmentations` are trying to help speed up computations (see the code). We can also fun the above with less commands:
 ```
 $ python
 >>> import legendrian_links as ll
@@ -84,7 +93,10 @@ $ python
 2022-03-16 10:11:02,702|utils|INFO|Ending execution set_augmentations
 >>> pd.lch_dga.decompress_augmentations()
 ```
-Now we can proceed with computing bilinearized homologies, etc. We're working on more functionality to deal with large numbers of augmentations.
+Now we can proceed with computing bilinearized homologies, etc. If the number of augmentations is very large, we can select subsets of the augmentations using the `fill_na` option:
+```
+>>> pd.lch_dga.decompress_augmentations(fill_na=0)
+```
 
 # Technical notes
 

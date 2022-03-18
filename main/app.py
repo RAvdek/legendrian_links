@@ -159,6 +159,9 @@ def home():
         orientations = request.args.get('orientation_flips')
         if orientations is not None:
             orientation_flips = [x.lower() == 'true' for x in orientations.split(',')]
+        aug_fill_na = request.args.get('aug_fill_na')
+        if aug_fill_na is not None:
+            aug_fill_na = int(aug_fill_na)
         pd = ll.PlatDiagram(
             n_strands=n_strands,
             front_crossings=crossings,
@@ -168,6 +171,7 @@ def home():
             lazy_disks=lazy_disks,
             lazy_lch=lazy_lch,
             lazy_rsft=lazy_rsft,
+            aug_fill_na=aug_fill_na
         )
     else:
         data = LINKS[DEFAULT_LINK_KEY].copy()

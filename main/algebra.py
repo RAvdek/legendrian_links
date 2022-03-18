@@ -117,6 +117,7 @@ class Matrix(object):
         values = np.matmul(self.values, other.values)
         return Matrix(values=values, coeff_mod=self.coeff_mod, lazy_ref=self.lazy_ref)
 
+    @utils.log_start_stop
     def set_row_echelon(self):
         """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
 
@@ -353,8 +354,8 @@ class ChainComplex(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, filtration_levels=None,
-                 coeff_mod=0, grading_mod=0, lazy_aug_data=False, lazy_augs=False, lazy_bilin=False):
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0,
+                 lazy_aug_data=False, lazy_augs=False, lazy_bilin=False, aug_fill_na=None):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,
@@ -373,6 +374,7 @@ class DGA(DGBase):
         self.lazy_aug_data = lazy_aug_data
         self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
+        self.aug_fill_na = aug_fill_na
         if lazy_augs and not lazy_bilin:
             raise ValueError("DGA cannot autocompute bilinearized polys without autocomputing augmentations")
 
@@ -608,6 +610,8 @@ class DGA(DGBase):
             LOG.info(f"Found {self.n_augs} (uncompressed) augmentations of DGA")
 
     def get_decompressed_augmentations(self, start_i=None, end_i=None, fill_na=None):
+        if fill_na is None:
+            fill_na = self.aug_fill_na
         if fill_na is not None:
             LOG.info(f"Working with a subset of augmentations using default value {fill_na}")
         if start_i is None:
@@ -627,6 +631,8 @@ class DGA(DGBase):
     def decompress_augmentations(self, fill_na=None):
         # comm_augs will be a list of dicts whose keys are the commutative symbols.
         # We need to switch them back!
+        if fill_na is None:
+            fill_na = self.aug_fill_na
         self.augmentations = self.get_decompressed_augmentations(fill_na=fill_na)
         self.n_augs = len(self.augmentations)
         LOG.info(f"Found {self.n_augs} augmentations of DGA")

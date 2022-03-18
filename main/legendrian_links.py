@@ -486,7 +486,7 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False, lazy_lch=True, lazy_rsft=True):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False, lazy_lch=True, lazy_rsft=True, aug_fill_na=None):
         self.n_strands = n_strands
         if mirror:
             self.front_crossings = list(reversed(front_crossings))
@@ -497,8 +497,11 @@ class PlatDiagram(object):
         self.lazy_disks = lazy_disks
         self.lazy_lch = lazy_lch
         self.lazy_rsft = lazy_rsft
-        LOG.info(f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, mirror={mirror}"
-                 f"n_copy={n_copy}, lazy_disks={lazy_disks}, lazy_lch={lazy_lch}, lazy_rsft={lazy_rsft})")
+        self.aug_fill_na = aug_fill_na
+        LOG.info(
+            f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, mirror={mirror}"
+            f"n_copy={n_copy}, lazy_disks={lazy_disks}, lazy_lch={lazy_lch}, lazy_rsft={lazy_rsft}), "
+            f"aug_fill_na={aug_fill_na}")
 
         if lazy_disks and ((not lazy_lch) or (not lazy_rsft)):
             raise ValueError("Cannot autocompute DGAs with lazy_disks=True")
@@ -960,7 +963,8 @@ class PlatDiagram(object):
         }
         gradings = {g.symbol: g.grading for g in self.lch_generators}
         self.lch_dga = algebra.DGA(
-            gradings=gradings, differentials=lch_del, coeff_mod=2, lazy_augs=lazy_augs, lazy_bilin=lazy_bilin
+            gradings=gradings, differentials=lch_del, coeff_mod=2,
+            lazy_augs=lazy_augs, lazy_bilin=lazy_bilin, aug_fill_na=self.aug_fill_na
         )
 
     @utils.log_start_stop
@@ -1167,5 +1171,6 @@ class PlatDiagram(object):
             filtration_levels=filtration_levels,
             coeff_mod=2,
             lazy_augs=lazy_augs,
-            lazy_bilin=lazy_bilin
+            lazy_bilin=lazy_bilin,
+            aug_fill_na=self.aug_fill_na
         )
