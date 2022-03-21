@@ -10,8 +10,8 @@ HALF = sympy.Rational(1, 2)
 
 
 def graded_by_valid_or_except(graded_by):
-    if not (graded_by.is_ZZ or (graded_by.is_FiniteField and graded_by.mod == 2)):
-        raise ValueError(f"Generator must be graded by Z or Z2. Graded by {str(graded_by)}")
+    if not graded_by in [0, 2]:
+        raise ValueError(f"Generator must be graded by Z or Z2. Graded by Z/{str(graded_by)}Z")
 
 
 class Chord(object):
@@ -49,11 +49,11 @@ class Chord(object):
 
 class LCHGenerator(object):
 
-    def __init__(self, chord, graded_by, capping_path=None):
+    def __init__(self, chord, grading_mod, capping_path=None):
         self.chord = chord
         self.capping_path = capping_path
-        graded_by_valid_or_except(graded_by)
-        self.graded_by = graded_by
+        graded_by_valid_or_except(grading_mod)
+        self.grading_mod = grading_mod
         self._set_grading()
         self._set_x()
         self._set_symbol()
@@ -62,7 +62,7 @@ class LCHGenerator(object):
         return "{" + str(self.chord.x) + "}"
 
     def _set_grading(self):
-        if self.graded_by.is_ZZ:
+        if self.grading_mod == 0:
             maslov = self.capping_path.rotation_number - HALF
             self.grading = maslov
         else:
@@ -77,14 +77,14 @@ class LCHGenerator(object):
 
 class RSFTGenerator(object):
 
-    def __init__(self, word, graded_by, capping_paths=None):
+    def __init__(self, word, grading_mod, capping_paths=None):
         for chord in word:
             if not isinstance(chord, Chord):
                 raise ValueError("Trying to create WordOfChord object not from a list of chords")
         self.word = word
         self.filtration_level = len(word)
-        graded_by_valid_or_except(graded_by)
-        self.graded_by = graded_by
+        graded_by_valid_or_except(grading_mod)
+        self.grading_mod = grading_mod
         self.capping_paths = capping_paths
         self._validate_capping_paths()
         self._set_grading()
@@ -96,14 +96,14 @@ class RSFTGenerator(object):
          return "{" + ",".join([str(chord.x) for chord in self.word]) + "}"
 
     def _validate_capping_paths(self):
-        if self.graded_by.is_ZZ:
+        if self.grading_mod == 0:
             if self.capping_paths is None:
                 raise ValueError(f"Z graded RSFT generators need capping paths.")
             if len(self.capping_paths) != len(self.word):
                 raise ValueError(f"len(capping_paths) = {len(self.capping_paths)} != len(word) = {len(self.word)}")
 
     def _set_grading(self):
-        if self.graded_by.is_ZZ:
+        if self.grading_mod == 0:
             self.grading = -1 + HALF*len(self.word) + sum([path.rotation_number for path in self.capping_paths])
         else:
             self.grading = (-1 + len(self.word) + len([chord for chord in self.word if chord.sign == -1])) % 2
@@ -695,13 +695,13 @@ class PlatDiagram(object):
         self._set_disk_corners()
 
     def set_lch(self, lazy_augs=False, lazy_bilin=False):
-        self._set_lch_graded_by()
+        self._set_lch_grading_mod()
         self._set_lch_generators()
         self._set_lch_dga(lazy_augs=lazy_augs, lazy_bilin=lazy_bilin)
 
     def set_rsft(self, lazy_augs=False, lazy_bilin=False):
         self._set_composable_admissible_words()
-        self._set_rsft_graded_by()
+        self._set_rsft_grading_mod()
         self._set_rsft_generators()
         self._set_rsft_dga(lazy_augs=lazy_augs, lazy_bilin=lazy_bilin)
 
@@ -843,19 +843,19 @@ class PlatDiagram(object):
         self.knots = knots
         self.link_is_connected = len(self.knots) == 1
 
-    def _set_lch_graded_by(self):
+    def _set_lch_grading_mod(self):
         """We only use Z gradings for LCH when our link is a not with zero rotation. This can be improved."""
         if len(self.knots) == 1 and self.knots[0]['rot'] == 0:
-            self.lch_graded_by = ZZ
+            self.lch_grading_mod = 0
         else:
-            self.lch_graded_by = ZZ2
+            self.lch_grading_mod = 2
 
-    def _set_rsft_graded_by(self):
+    def _set_rsft_grading_mod(self):
         """Only use Z gradings if all knot components have rot=0. This can be improved."""
         if all([k['rot'] == 0 for k in self.knots]):
-            self.rsft_graded_by = ZZ
+            self.rsft_grading_mod = 0
         else:
-            self.rsft_graded_by = ZZ2
+            self.rsft_grading_mod = 2
 
     @utils.log_start_stop
     def _set_composable_pairs(self):
@@ -929,12 +929,12 @@ class PlatDiagram(object):
         for chord in self.chords:
             capping_path = (
                 self.get_capping_path(start_chord=chord, end_chord=chord)
-                if self.lch_graded_by == ZZ else None
+                if self.lch_grading_mod == 0 else None
             )
             lch_generators.append(
                 LCHGenerator(
                     chord=chord,
-                    graded_by=self.lch_graded_by,
+                    grading_mod=self.lch_grading_mod,
                     capping_path=capping_path)
             )
         self.lch_generators = lch_generators
@@ -963,7 +963,7 @@ class PlatDiagram(object):
         }
         gradings = {g.symbol: g.grading for g in self.lch_generators}
         self.lch_dga = algebra.DGA(
-            gradings=gradings, differentials=lch_del, coeff_mod=2,
+            gradings=gradings, differentials=lch_del, coeff_mod=2, grading_mod=self.lch_grading_mod,
             lazy_augs=lazy_augs, lazy_bilin=lazy_bilin, aug_fill_na=self.aug_fill_na
         )
 
@@ -990,7 +990,7 @@ class PlatDiagram(object):
             for w in self.composable_admissible_words[wl]:
                 if w[-1].is_composable_with(w[0]):
                     capping_paths = None
-                    if self.rsft_graded_by.is_ZZ:
+                    if self.rsft_grading_mod == 0:
                         if len(w) == 1:
                             capping_paths = [self.get_capping_path(w[0], w[0])]
                         else:
@@ -999,7 +999,7 @@ class PlatDiagram(object):
                     cyclic_composable_admissible_words.append(
                         RSFTGenerator(
                             word=w,
-                            graded_by=self.rsft_graded_by,
+                            grading_mod=self.rsft_grading_mod,
                             capping_paths=capping_paths
                         )
                     )
@@ -1170,6 +1170,7 @@ class PlatDiagram(object):
             differentials=rsft_del,
             filtration_levels=filtration_levels,
             coeff_mod=2,
+            grading_mod=self.rsft_grading_mod,
             lazy_augs=lazy_augs,
             lazy_bilin=lazy_bilin,
             aug_fill_na=self.aug_fill_na

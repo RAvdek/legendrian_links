@@ -11,7 +11,7 @@ Poincare polynomials for {{ ctx["name"] }} augmentations:
   </tr>
   {% for i in range(ctx["n_augs"]) %}
   <tr>
-    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<th>{{ ctx["bilin_polys"][(i,j)] }}</th>{% endfor %}
+    <th>{{ i }}</th>{% for j in range(ctx["n_augs"]) %}<td {% if i == j %} style="background-color:#cdfaee" {% endif %}>{{ ctx["bilin_polys"][(i,j)] }}</td>{% endfor %}
   </tr>
   {% endfor %}
 </table>

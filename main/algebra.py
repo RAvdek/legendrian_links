@@ -117,7 +117,6 @@ class Matrix(object):
         values = np.matmul(self.values, other.values)
         return Matrix(values=values, coeff_mod=self.coeff_mod, lazy_ref=self.lazy_ref)
 
-    @utils.log_start_stop
     def set_row_echelon(self):
         """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
 
@@ -148,6 +147,10 @@ class Matrix(object):
         while np.any(ref[k + 1:, l]):
             ref, q, q_inv = self._row_prepare(ref, q, q_inv, k, l)
             ref, q, q_inv = self._partial_row_reduce(ref, q, q_inv, k, l)
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            q %= self.coeff_mod
+            q_inv %= self.coeff_mod
         return ref, q, q_inv
 
     def _row_prepare(self, ref, q, q_inv, k, l):
@@ -155,6 +158,10 @@ class Matrix(object):
         ref[[i, k], :] = ref[[k, i], :]
         q_inv[[i, k], :] = q_inv[[k, i], :]  # row swap
         q[:, [i, k]] = q[:, [k, i]]  # column swap
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            q %= self.coeff_mod
+            q_inv %= self.coeff_mod
         return ref, q, q_inv
 
     @staticmethod
@@ -180,6 +187,10 @@ class Matrix(object):
                 ref[i] %= self.coeff_mod
                 q_inv[i] %= self.coeff_mod
                 q[:, k] %= self.coeff_mod
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            q %= self.coeff_mod
+            q_inv %= self.coeff_mod
         return ref, q, q_inv
 
 
@@ -458,10 +469,11 @@ class DGA(DGBase):
     def get_bilin_differential(self, aug_1, aug_2):
         subs_1 = self.get_verbose_subs_from_aug(aug_1)
         subs_2 = self.get_verbose_subs_from_aug(aug_2)
-        return {
-            g: v.bilinearize(subs_1, subs_2)
-            for g, v in self.differentials.items()
-        }
+        output = dict()
+        for g, v in self.differentials.items():
+            bi_diff = v.bilinearize(subs_1, subs_2)
+            output[g] = bi_diff
+        return output
 
     @utils.log_start_stop
     def set_all_bilin(self):
@@ -584,7 +596,7 @@ class DGA(DGBase):
         zero_graded_symbols = list(self.aug_symbols_to_comm_symbols.keys())
         comm_symbols = list(self.aug_symbols_to_comm_symbols.values())
         if len(zero_graded_symbols) == 0:
-            comm_augmentations = []
+            comm_augmentations = [dict()]
         else:
             if batch_size is not None:
                 comm_augmentations = polynomials.batch_zero_set(
