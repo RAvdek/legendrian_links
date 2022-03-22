@@ -1,6 +1,6 @@
 # Legendrian links
 
-An interactive application for analyzing Legendrian links.
+An interactive application for analyzing Legendrian links. This project is currently under active development and has not been publicly announced.
 
 Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra and be able to handle heavy computations. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
 
