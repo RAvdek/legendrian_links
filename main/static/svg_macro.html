@@ -25,7 +25,7 @@ Knots with classical invariants:
 <br><br>
 <table>
   <tr>
-    <th>Label</th>
+    <th>Knot label</th>
     <th>Color</th>
     <th>tb</th>
     <th>rot</th>
@@ -43,5 +43,18 @@ Knots with classical invariants:
   </tr>
   {% endfor %}
 </table>
+{% if not ctx["link_is_connected"] %}
+<br><br>
+Linking matrix
+<br><br>
+<table>
+  <tr><th>Knot label</th> {% for kl in ctx["knot_labels"] %}<th>{{ kl }}</th>{% endfor %}</tr>
+  {% for kl in ctx["knot_labels"] %}
+    <tr>
+      <th>{{ kl }}</th>{% for kl_2 in ctx["knot_labels"] %}<td>{{ ctx["linking_matrix"][(kl, kl_2)] }}</td>{% endfor %}
+    </tr>
+  {% endfor %}
+</table>
+{% endif %}
 
 {%- endmacro %}

@@ -518,6 +518,7 @@ class PlatDiagram(object):
         # wait to set crossings until the line segments have been labeled
         self._set_chords()
         self._set_knots()
+        self._set_linking_matrix()
         if lazy_disks:
             return
         self.set_disks_and_gradings()
@@ -842,6 +843,20 @@ class PlatDiagram(object):
 
         self.knots = knots
         self.link_is_connected = len(self.knots) == 1
+
+    def _set_linking_matrix(self):
+        output = dict()
+        for k_1 in range(len(self.knots)):
+            for k_2 in range(len(self.knots)):
+                output[(k_1, k_2)] = 0
+        for c in self.chords:
+            if not c.is_pure():
+                start = c.bottom_line_segment.knot_label
+                end = c.top_line_segment.knot_label
+                output[(start, end)] += HALF * c.sign
+                output[(end, start)] += HALF * c.sign
+        self.linking_matrix = output
+
 
     def _set_lch_grading_mod(self):
         """We only use Z gradings for LCH when our link is a not with zero rotation. This can be improved."""

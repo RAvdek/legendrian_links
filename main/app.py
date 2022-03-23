@@ -10,6 +10,10 @@ from jinja2 import Environment, FileSystemLoader, Template
 import utils
 import legendrian_links as ll
 
+
+LOG = utils.LOG
+
+# Link resources
 LINKS = utils.LINKS
 DEFAULT_LINK_KEY = 'm10_132_nv'
 
@@ -70,6 +74,9 @@ def get_diagram_context(pd, increment=50, pad=10):
     line_segments = pd.get_line_segment_array()
     output = {
         "knots": knots,
+        "knot_labels": list(range(len(knots))),
+        "link_is_connected": pd.link_is_connected,
+        "linking_matrix": pd.linking_matrix,
         "pad": pad,
         "increment": increment,
         "height": height,

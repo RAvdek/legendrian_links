@@ -191,12 +191,18 @@ class TestZeroSet(unittest.TestCase):
         output = polynomials.zero_set(polys=polys, symbols=self.symbols)
         self.assertEqual(len(output), 0)
 
+        output = polynomials.zero_set(polys=polys, symbols=[])
+        self.assertEqual(len(output), 0)
+
     def test_zero_const(self):
         polys = [0]
         output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=False)
         self.assertEqual(len(output), 8)
         output = polynomials.zero_set(polys=polys, symbols=self.symbols, allow_unset=True)
         self.assertEqual(len(output), 1)
+
+        output = polynomials.zero_set(polys=polys, symbols=[])
+        self.assertEqual(output, [dict()])
 
     def test_quad(self):
         polys = [1 + self.a*self.b]

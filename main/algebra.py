@@ -595,23 +595,20 @@ class DGA(DGBase):
             self.set_aug_data()
         zero_graded_symbols = list(self.aug_symbols_to_comm_symbols.keys())
         comm_symbols = list(self.aug_symbols_to_comm_symbols.values())
-        if len(zero_graded_symbols) == 0:
-            comm_augmentations = [dict()]
+        if batch_size is not None:
+            comm_augmentations = polynomials.batch_zero_set(
+                polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod, batch_size=batch_size)
+        elif filtered:
+            comm_filtration_levels = {
+                v: self.filtration_levels[k]
+                for k, v in self.aug_symbols_to_comm_symbols.items()
+            }
+            comm_augmentations = polynomials.filtered_zero_set(
+                polys=self.aug_polys, symbols=comm_symbols,
+                filtration_levels=comm_filtration_levels, modulus=self.coeff_mod)
         else:
-            if batch_size is not None:
-                comm_augmentations = polynomials.batch_zero_set(
-                    polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod, batch_size=batch_size)
-            elif filtered:
-                comm_filtration_levels = {
-                    v: self.filtration_levels[k]
-                    for k, v in self.aug_symbols_to_comm_symbols.items()
-                }
-                comm_augmentations = polynomials.filtered_zero_set(
-                    polys=self.aug_polys, symbols=comm_symbols,
-                    filtration_levels=comm_filtration_levels, modulus=self.coeff_mod)
-            else:
-                comm_augmentations = polynomials.zero_set(
-                    polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod)
+            comm_augmentations = polynomials.zero_set(
+                polys=self.aug_polys, symbols=comm_symbols, modulus=self.coeff_mod)
         self.augmentations_compressed = comm_augmentations
         self.n_augs_compressed = len(self.augmentations_compressed)
         LOG.info(f"Found {self.n_augs_compressed} compressed augmentations of DGA")

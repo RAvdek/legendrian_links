@@ -57,6 +57,15 @@ def expand_zero_set_from_unset(zeros, modulus=2, fill_na=None):
     return output
 
 
+def polys_have_nonzero_const(polys, modulus=2):
+    ff_elements = finite_field_elements(modulus)
+    ff_elements.remove(0)
+    for i in ff_elements:
+        if i in polys:
+            return True
+    return False
+
+
 @utils.log_start_stop
 def zero_set(
         polys, symbols, modulus=2,
@@ -83,6 +92,10 @@ def zero_set(
     LOG.info(f"Searching for zero set of {len(polys)} polynomials in {len(symbols)} variables")
     if modulus == 0:
         raise ValueError("We can only solve for zero sets over Z/mZ with m!=0.")
+    if polys_have_nonzero_const(polys=polys, modulus=modulus):
+        return []
+    if len(symbols) == 0:
+        return [dict()]
     if subs_dicts is None:
         subs_dicts = [dict()]
     roots = []
@@ -144,6 +157,10 @@ def zero_set(
 def filtered_zero_set(polys, symbols, filtration_levels, modulus=2, groebner_timeout=GROEBNER_TIMEOUT_DEFAULT):
     if modulus == 0:
         raise ValueError("We can only solve for zero sets over Z/mZ with m!=0.")
+    if polys_have_nonzero_const(polys=polys, modulus=modulus):
+        return []
+    if len(symbols) == 0:
+        return [dict()]
     f_level_values = sorted(utils.unique_elements(list(filtration_levels.values())))
     f_to_sym = {
         f: {sym for sym in symbols if filtration_levels[sym] == f}
@@ -208,6 +225,10 @@ def batch_zero_set(polys, symbols, modulus=2, groebner_timeout=GROEBNER_TIMEOUT_
         raise ValueError("We can only solve for zero sets over Z/mZ with m!=0.")
     if batch_size <= 0:
         raise ValueError(f"Need batch_size={batch_size} at least 1")
+    if polys_have_nonzero_const(polys=polys, modulus=modulus):
+        return []
+    if len(symbols) == 0:
+        return [dict()]
     poly_to_symbols = {p: poly_symbols(p) for p in polys}
     # Frequencies of symbols will help isolate those which occur most often
     ## Could just try to find zeros determined by polynomials having the most frequent symbols
