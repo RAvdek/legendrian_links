@@ -129,6 +129,8 @@ I cannot guarantee that this is not a bad idea!
 
 ## Features
 
+- Normalized euler characteristic and normalized augmentation count.
+- Need to update REF computations to RREF if we want to reasonably compute spectral sequences.
 - Compute spectral sequence polynomials to improve poincare polynomials.
 - Tools for decompressing augmentations. We want to control the order of augmentations so that we can track them by indices.
 - How do we more efficiently store augmentations? Maybe as `SubsNode`s? Currently it appears that compressed augs can expand enormously.
