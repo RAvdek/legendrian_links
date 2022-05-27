@@ -5,6 +5,7 @@ import random
 import signal
 import string
 import threading
+import sympy
 
 
 with open('links.json') as f:
@@ -135,3 +136,11 @@ def rotate(array, n):
     """
     n %= len(array)
     return array[n:] + array[:n]
+
+
+# math helper functions
+
+def num_inverse(n, coeff_mod):
+    if coeff_mod == 0:
+        return sympy.Rational(n)**(-1)
+    return pow(n, -1, coeff_mod)

@@ -54,14 +54,12 @@ class Matrix(object):
     """Attributes:
 
     values: np.array
-    n_rows:
-    n_cols:
+    n_rows: Int
+    n_cols: Int
     coeff_mod: Consider as matrix with coeffs modulus this number
     ref: Row echelon form
     ref_q: Matrix such that ref_q * ref = self
     ref_q_inv: Inverse of ref_q
-    _rank_im: Dimension of the image
-    _rank_ker: Dimension of the kernel
     """
 
     def __init__(self, values, coeff_mod=0):
@@ -131,22 +129,22 @@ class Matrix(object):
         :return: None
         """
         ref = self.values.copy()
-        q = np.identity(self.n_rows)
-        q_inv = np.identity(self.n_rows)
-        k = 0
-        l = 0
-        while k < self.n_rows:
-            while l < self.n_cols and not (np.any(ref[k:, l])):
-                l += 1
-            if l == self.n_cols:
+        ref_q = np.identity(self.n_rows)
+        ref_q_inv = np.identity(self.n_rows)
+        row_num = 0
+        col_num = 0
+        while row_num < self.n_rows:
+            while col_num < self.n_cols and not (np.any(ref[row_num:, col_num])):
+                col_num += 1
+            if col_num == self.n_cols:
                 break
-            ref, q, q_inv = self._row_reduce(ref, q, q_inv, k, l)
-            k += 1
+            ref, ref_q, ref_q_inv = self._row_reduce(ref, ref_q, ref_q_inv, row_num, col_num)
+            row_num += 1
         self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
-        self.ref_q = Matrix(q, coeff_mod=self.coeff_mod)
-        self.ref_q_inv = Matrix(q_inv, coeff_mod=self.coeff_mod)
-        self._rank_im = k
-        self._rank_ker = self.n_cols - k
+        self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
+        self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
+        self._rank_im = row_num
+        self._rank_ker = self.n_cols - row_num
         # need to set pivots and free indices
         pivot_indices = list()
         free_indices = list()
@@ -154,13 +152,13 @@ class Matrix(object):
         loc_col = 0
         while loc_col < self.n_cols:
             pivot = False
-            if ref.values[loc_row, loc_col] == 0:
+            if self.ref.values[loc_row, loc_col] == 0:
                 free_indices.append(loc_col)
-            else:
-                pivot_indices.append(loc_col)
+            elif loc_row not in [x[0] for x in pivot_indices]:
+                pivot_indices.append([loc_row, loc_col])
                 pivot = True
             loc_col += 1
-            if pivot and loc_row < self.n_rows:
+            if pivot and loc_row < self.n_rows - 1:
                 loc_row += 1
         self.ref_pivot_indices = pivot_indices
         self.ref_free_indices = free_indices
@@ -170,31 +168,40 @@ class Matrix(object):
 
         :return: None
         """
-        raise NotImplementedError()
+        if self.ref is None:
+            self.set_row_echelon()
+        ref, ref_q, ref_q_inv = self.ref.values, self.ref_q.values, self.ref_q_inv.values
+        for row_num, col_num in self.ref_pivot_indices:
+            if self.coeff_mod != 2:
+                ref, ref_q, ref_q_inv = self._rref_normalize(ref, ref_q, ref_q_inv, row_num, col_num)
+            ref, ref_q, ref_q_inv = self._rref_column_clean(ref, ref_q, ref_q_inv, row_num, col_num)
+        self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
+        self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
+        self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
 
     def is_square(self):
         return self.n_rows == self.n_cols
 
-    def _row_reduce(self, ref, q, q_inv, k, l):
+    def _row_reduce(self, ref, ref_q, ref_q_inv, k, l):
         while np.any(ref[k + 1:, l]):
-            ref, q, q_inv = self._row_prepare(ref, q, q_inv, k, l)
-            ref, q, q_inv = self._partial_row_reduce(ref, q, q_inv, k, l)
+            ref, ref_q, ref_q_inv = self._ref_swap(ref, ref_q, ref_q_inv, k, l)
+            ref, ref_q, ref_q_inv = self._ref_addition(ref, ref_q, ref_q_inv, k, l)
         if self.coeff_mod != 0:
             ref %= self.coeff_mod
-            q %= self.coeff_mod
-            q_inv %= self.coeff_mod
-        return ref, q, q_inv
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
 
-    def _row_prepare(self, ref, q, q_inv, k, l):
-        (a, i) = self._smallest_nonzero_index(ref[:, l], k)
-        ref[[i, k], :] = ref[[k, i], :]
-        q_inv[[i, k], :] = q_inv[[k, i], :]  # row swap
-        q[:, [i, k]] = q[:, [k, i]]  # column swap
+    def _ref_swap(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        (a, i) = self._smallest_nonzero_index(ref[:, col_num], row_num)
+        ref[[i, row_num], :] = ref[[row_num, i], :]
+        ref_q_inv[[i, row_num], :] = ref_q_inv[[row_num, i], :]  # row swap
+        ref_q[:, [i, row_num]] = ref_q[:, [row_num, i]]  # column swap
         if self.coeff_mod != 0:
             ref %= self.coeff_mod
-            q %= self.coeff_mod
-            q_inv %= self.coeff_mod
-        return ref, q, q_inv
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
 
     @staticmethod
     def _smallest_nonzero_index(v, k):
@@ -206,24 +213,55 @@ class Matrix(object):
         except:
             return 0, np.nan  # minNonZero causes this sometimes
 
-    def _partial_row_reduce(self, ref, q, q_inv, k, l):
-        for i in range(k + 1, q.shape[0]):
-            c = (ref[i, l] // ref[k, l])
+    def _ref_addition(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        for i in range(row_num + 1, ref_q.shape[0]):
+            coeff = (ref[i, col_num] // ref[row_num, col_num])
             if self.coeff_mod != 0:
-                c %= self.coeff_mod
+                coeff %= self.coeff_mod
             # row add i,k,-q
-            ref[i] += (-c * ref[k])
-            q_inv[i] += (-c * q_inv[k])  # row add
-            q[:, k] += (c * q[:, i])  # column add (note i,k are switched)
+            ref[i] += (-coeff * ref[row_num])
+            ref_q_inv[i] += (-coeff * ref_q_inv[row_num])  # row add
+            ref_q[:, row_num] += (coeff * ref_q[:, i])  # column add (note i,k are switched)
             if self.coeff_mod != 0:
                 ref[i] %= self.coeff_mod
-                q_inv[i] %= self.coeff_mod
-                q[:, k] %= self.coeff_mod
+                ref_q_inv[i] %= self.coeff_mod
+                ref_q[:, row_num] %= self.coeff_mod
         if self.coeff_mod != 0:
             ref %= self.coeff_mod
-            q %= self.coeff_mod
-            q_inv %= self.coeff_mod
-        return ref, q, q_inv
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
+
+    def _rref_normalize(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        coeff = ref[row_num, col_num]
+        coeff_inv = utils.num_inverse(coeff, self.coeff_mod)
+        # divide ref and ref_q_inv row by coefficient at the pivot
+        ref[row_num, :] = coeff_inv * ref[row_num, :]
+        ref_q_inv[row_num, :] = coeff_inv * ref_q_inv[row_num, :]
+        # multiple ref_q column by coefficient at the pivot
+        ref_q[:, row_num] = coeff * ref_q[:, row_num]
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
+
+    def _rref_column_clean(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        # add rows to eliminate entries above the specified pivot entry
+        if not ref[row_num, col_num] == 1:
+            raise ValueError(f"ref[row_num, col_num] = {ref[row_num, col_num]} != 1")
+        if row_num == 0:
+            return ref, ref_q, ref_q_inv
+        for i in range(0, row_num):
+            coeff = ref[i, col_num]
+            ref[i, :] -= coeff * ref[row_num, :]
+            ref_q_inv[i, :] -= coeff * ref_q_inv[row_num, :]
+            ref_q[:, row_num] += coeff * ref_q[:, i]
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
 
 
 class LinearMap(object):
@@ -361,9 +399,9 @@ class ChainComplex(DGBase):
             if self.grading_mod != 0:
                 i_min_1 %= self.grading_mod
             linear_map = self.linear_maps[i]
-            rank_im = linear_map.matrix._rank_im()
+            rank_im = linear_map.matrix.rank_im()
             rank_im_dual = rank_im
-            rank_ker = linear_map.matrix._rank_ker()
+            rank_ker = linear_map.matrix.rank_ker()
             rank_ker_dual = linear_map.dim_range - rank_im_dual
             # Sum up bettis
             if i in output_dict.keys():
@@ -374,15 +412,6 @@ class ChainComplex(DGBase):
                 output_dict[i_min_1] -= rank_im
             else:
                 output_dict[i_min_1] = -rank_im
-            # Sum up dual bettis
-            if i_min_1 in output_dual_dict.keys():
-                output_dual_dict[i_min_1] += rank_ker_dual
-            else:
-                output_dual_dict[i_min_1] = rank_ker_dual
-            if i in output_dual_dict.keys():
-                output_dual_dict[i] -= rank_im_dual
-            else:
-                output_dual_dict[i] = -rank_im_dual
         # poincare poly
         output = 0
         for i in output_dict.keys():

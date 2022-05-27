@@ -18,6 +18,15 @@ def comparable_list_of_dicts(l):
     return sorted([json.dumps({str(k): str(v) for k, v in d.items()}, sort_keys=True) for d in l])
 
 
+class TestUtils(unittest.TestCase):
+
+    def test_num_inverse(self):
+        self.assertEqual(sympy.Rational(1, 2), utils.num_inverse(2, 0))
+        self.assertEqual(sympy.Rational(3, 2), utils.num_inverse(sympy.Rational(2, 3), 0))
+        self.assertEqual(1, utils.num_inverse(1, 2))
+        self.assertEqual(2, utils.num_inverse(3, 5))
+
+
 class TestLinks(unittest.TestCase):
 
     def _test_link(self, n_strands, front_crossings, n_knots, n_disks, tb_rot=None, lch_gradings=None):
