@@ -129,16 +129,16 @@ I cannot guarantee that this is not a bad idea!
 
 ## Features
 
-- Normalized euler characteristic and normalized augmentation count.
 - Need to update REF computations to RREF if we want to reasonably compute spectral sequences.
 - Compute spectral sequence polynomials to improve poincare polynomials.
+- Normalized euler characteristic and normalized augmentation count.
+- Compute the full augmentation tree?
 - Tools for decompressing augmentations. We want to control the order of augmentations so that we can track them by indices.
 - How do we more efficiently store augmentations? Maybe as `SubsNode`s? Currently it appears that compressed augs can expand enormously.
 - Capping paths is storing too much info. We really only need this for rotation numbers.
 - Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
 - Command line interface would make it easy to run scripts.
 - Way behind on testing...
-- Application is maintaining some variables between requests? I think this is due to mutable function args. Should be solved now.
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
 - Copy knot tables.
