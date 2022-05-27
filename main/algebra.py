@@ -53,7 +53,6 @@ class Differential(object):
 class Matrix(object):
     """Attributes:
 
-    lazy_ref: If False, compute row echelon form upon initialization
     values: np.array
     n_rows:
     n_cols:
@@ -61,12 +60,11 @@ class Matrix(object):
     ref: Row echelon form
     ref_q: Matrix such that ref_q * ref = self
     ref_q_inv: Inverse of ref_q
-    rank_im: Dimension of the image
-    rank_ker: Dimension of the kernel
+    _rank_im: Dimension of the image
+    _rank_ker: Dimension of the kernel
     """
 
-    def __init__(self, values, coeff_mod=0, lazy_ref=False):
-        self.lazy_ref = lazy_ref
+    def __init__(self, values, coeff_mod=0):
         self.values = np.array(values)
 
         wrong_shape = len(self.values.shape) != 2
@@ -82,10 +80,10 @@ class Matrix(object):
         self.ref = None
         self.ref_q = None
         self.ref_q_inv = None
-        self.rank_im = None
-        self.rank_ker = None
-        if not lazy_ref:
-            self.set_row_echelon()
+        self.ref_free_indices = None
+        self.ref_pivot_indices = None
+        self._rank_im = None
+        self._rank_ker = None
 
     def __repr__(self):
         return str(self.values)
@@ -97,8 +95,8 @@ class Matrix(object):
             self.ref = self
             self.ref_q = self
             self.ref_q_inv = self
-            self.rank_im = 0
-            self.rank_ker = 0
+            self._rank_im = 0
+            self._rank_ker = 0
             return
         else:
             raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
@@ -115,7 +113,17 @@ class Matrix(object):
             raise ValueError(f"Trying to multiply matrix having coeff_modulus={self.coeff_mod} "
                              f"with other having coeff_modulus={other.coeff_mod}")
         values = np.matmul(self.values, other.values)
-        return Matrix(values=values, coeff_mod=self.coeff_mod, lazy_ref=self.lazy_ref)
+        return Matrix(values=values, coeff_mod=self.coeff_mod)
+
+    def rank_im(self):
+        if self._rank_im is None:
+            self.set_row_echelon()
+        return self._rank_im
+
+    def rank_ker(self):
+        if self._rank_ker is None:
+            self.set_row_echelon()
+        return self._rank_ker
 
     def set_row_echelon(self):
         """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
@@ -134,11 +142,35 @@ class Matrix(object):
                 break
             ref, q, q_inv = self._row_reduce(ref, q, q_inv, k, l)
             k += 1
-        self.ref = Matrix(ref, coeff_mod=self.coeff_mod, lazy_ref=True)
-        self.ref_q = Matrix(q, coeff_mod=self.coeff_mod, lazy_ref=True)
-        self.ref_q_inv = Matrix(q_inv, coeff_mod=self.coeff_mod, lazy_ref=True)
-        self.rank_im = k
-        self.rank_ker = self.n_cols - k
+        self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
+        self.ref_q = Matrix(q, coeff_mod=self.coeff_mod)
+        self.ref_q_inv = Matrix(q_inv, coeff_mod=self.coeff_mod)
+        self._rank_im = k
+        self._rank_ker = self.n_cols - k
+        # need to set pivots and free indices
+        pivot_indices = list()
+        free_indices = list()
+        loc_row = 0
+        loc_col = 0
+        while loc_col < self.n_cols:
+            pivot = False
+            if ref.values[loc_row, loc_col] == 0:
+                free_indices.append(loc_col)
+            else:
+                pivot_indices.append(loc_col)
+                pivot = True
+            loc_col += 1
+            if pivot and loc_row < self.n_rows:
+                loc_row += 1
+        self.ref_pivot_indices = pivot_indices
+        self.ref_free_indices = free_indices
+
+    def set_red_row_echelon(self):
+        """Override the ref variables with variables associated to reduced row echelon form
+
+        :return: None
+        """
+        raise NotImplementedError()
 
     def is_square(self):
         return self.n_rows == self.n_cols
@@ -329,9 +361,9 @@ class ChainComplex(DGBase):
             if self.grading_mod != 0:
                 i_min_1 %= self.grading_mod
             linear_map = self.linear_maps[i]
-            rank_im = linear_map.matrix.rank_im
+            rank_im = linear_map.matrix._rank_im()
             rank_im_dual = rank_im
-            rank_ker = linear_map.matrix.rank_ker
+            rank_ker = linear_map.matrix._rank_ker()
             rank_ker_dual = linear_map.dim_range - rank_im_dual
             # Sum up bettis
             if i in output_dict.keys():
