@@ -402,27 +402,6 @@ class ChainComplex(DGBase):
         self._set_matrices()
         self._poincare_poly = None
 
-    def _verify_linear_differentials(self):
-        for k, v in self.differentials.items():
-            if not v.is_linear():
-                raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
-
-    def _set_matrices(self):
-        # We have to use a dictionary because the degrees may be non-positive
-        self.matrices = dict()
-        for i in self.gradings.values():
-            i_min_1 = i - 1
-            if self.grading_mod != 0:
-                i_min_1 %= self.grading_mod
-            range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
-            domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
-            diffs = {s: self.differentials[s].expression for s in domain_symbols}
-            self.matrices[i] = LinearMap(
-                coeff_dict=diffs,
-                range_symbols=range_symbols,
-                coeff_mod=self.coeff_mod
-            ).matrix
-
     def get_poincare_poly(self):
         if self._poincare_poly is None:
             self.set_poincare_poly()
@@ -451,6 +430,62 @@ class ChainComplex(DGBase):
         for i in output_dict.keys():
             output += output_dict[i] * (POINCARE_POLY_VAR ** i)
         self._poincare_poly = output
+
+    def _verify_linear_differentials(self):
+        for k, v in self.differentials.items():
+            if not v.is_linear():
+                raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
+
+    def _set_matrices(self):
+        # We have to use a dictionary because the degrees may be non-positive
+        self.matrices = dict()
+        for i in self.gradings.values():
+            i_min_1 = i - 1
+            if self.grading_mod != 0:
+                i_min_1 %= self.grading_mod
+            range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
+            domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
+            diffs = {s: self.differentials[s].expression for s in domain_symbols}
+            self.matrices[i] = LinearMap(
+                coeff_dict=diffs,
+                range_symbols=range_symbols,
+                coeff_mod=self.coeff_mod
+            ).matrix
+
+
+class SpectralSequence(DGBase):
+
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
+        super(SpectralSequence, self).__init__(
+            gradings=gradings,
+            differentials=differentials,
+            filtration_levels=filtration_levels,
+            coeff_mod=coeff_mod,
+            grading_mod=grading_mod
+        )
+        self._filtered_vars = None
+        self._filtered_diffs = None
+        self._poincare_poly = None
+
+    def set_filtered_vars(self):
+        filtration_values = self.filtration_levels.values
+        max_filt = max(filtration_values)
+        min_filt = min(filtration_values)
+        filtered_vars = dict()
+        for i in range(min_filt, max_filt + 1):
+            filtered_vars[i] = [k for k, v in self.filtration_levels.items() if v == i]
+        self._filtered_vars = filtered_vars
+
+    def set_filtered_differentials(self):
+        diffs = dict()
+        for i in list(self._filtered_vars.keys()):
+            for j in [f for f in list(self._filtered_vars.keys()) if f <= i]:
+                non_j_vars_subs = {k: 0 for k, v in self.filtration_levels.items() if v != j}
+                diffs[(i, j)] = {
+                    k: v.subs(non_j_vars_subs)
+                    for k, v in self.differentials.items() if self.filtration_levels[k] == i
+                }
+        self._filtered_diffs = diffs
 
 
 class DGA(DGBase):
