@@ -60,7 +60,10 @@ class Matrix(object):
     ref: Row echelon form
     ref_q: Matrix such that ref_q * ref = self
     ref_q_inv: Inverse of ref_q
+    ref_form: Is the matrix REF (row echelon form) or RREF (reduced row echeleon form)?
     """
+    REF = 'REF'
+    RREF = 'RREF'
 
     def __init__(self, values, coeff_mod=0):
         self.values = np.array(values)
@@ -75,11 +78,13 @@ class Matrix(object):
         self.coeff_mod = coeff_mod
         if coeff_mod != 0:
             self.values %= self.coeff_mod
+        self.ref_form = None
         self.ref = None
         self.ref_q = None
         self.ref_q_inv = None
         self.ref_free_indices = None
         self.ref_pivot_indices = None
+        self._kernel = None
         self._rank_im = None
         self._rank_ker = None
 
@@ -114,11 +119,17 @@ class Matrix(object):
         return Matrix(values=values, coeff_mod=self.coeff_mod)
 
     def rank_im(self):
+        if self.n_rows == 0 or self.n_cols == 0:
+            return 0
         if self._rank_im is None:
             self.set_row_echelon()
         return self._rank_im
 
     def rank_ker(self):
+        if self.n_cols == 0:
+            return 0
+        if self.n_rows == 0:
+            return self.n_cols
         if self._rank_ker is None:
             self.set_row_echelon()
         return self._rank_ker
@@ -162,6 +173,7 @@ class Matrix(object):
                 loc_row += 1
         self.ref_pivot_indices = pivot_indices
         self.ref_free_indices = free_indices
+        self.ref_form = self.REF
 
     def set_red_row_echelon(self):
         """Override the ref variables with variables associated to reduced row echelon form
@@ -178,6 +190,26 @@ class Matrix(object):
         self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
         self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
         self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
+        self.ref_form = self.RREF
+
+    def kernel(self):
+        """Sets and returns the kernel as a list of column vectors"""
+        if self._kernel is not None:
+            return self._kernel
+        if self.ref_form != self.RREF:
+            self.set_red_row_echelon()
+        # we can compute the span of the kernel using the free variable columns
+        pivot_columns = [p[1] for p in self.ref_pivot_indices]
+        kernel = list()
+        for i in self.ref_free_indices:
+            v = np.zeros(self.n_cols)
+            v[i] = 1
+            for j in pivot_columns:
+                if j < i:
+                    v[j] = -self.values[j, i]
+            kernel.append(v)
+        self._kernel = kernel
+        return self._kernel
 
     def is_square(self):
         return self.n_rows == self.n_cols
@@ -367,17 +399,17 @@ class ChainComplex(DGBase):
             grading_mod=grading_mod
         )
         self._verify_linear_differentials()
-        self._set_linear_maps()
-        self._set_poincare_poly()
+        self._set_matrices()
+        self._poincare_poly = None
 
     def _verify_linear_differentials(self):
         for k, v in self.differentials.items():
             if not v.is_linear():
                 raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
 
-    def _set_linear_maps(self):
+    def _set_matrices(self):
         # We have to use a dictionary because the degrees may be non-positive
-        self.linear_maps = dict()
+        self.matrices = dict()
         for i in self.gradings.values():
             i_min_1 = i - 1
             if self.grading_mod != 0:
@@ -385,24 +417,26 @@ class ChainComplex(DGBase):
             range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
             domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
             diffs = {s: self.differentials[s].expression for s in domain_symbols}
-            self.linear_maps[i] = LinearMap(
+            self.matrices[i] = LinearMap(
                 coeff_dict=diffs,
                 range_symbols=range_symbols,
                 coeff_mod=self.coeff_mod
-            )
+            ).matrix
 
-    def _set_poincare_poly(self):
+    def get_poincare_poly(self):
+        if self._poincare_poly is None:
+            self.set_poincare_poly()
+        return self._poincare_poly
+
+    def set_poincare_poly(self):
         output_dict = dict()
-        output_dual_dict = dict()
-        for i in self.linear_maps.keys():
+        for i in self.matrices.keys():
             i_min_1 = i - 1
             if self.grading_mod != 0:
                 i_min_1 %= self.grading_mod
-            linear_map = self.linear_maps[i]
-            rank_im = linear_map.matrix.rank_im()
-            rank_im_dual = rank_im
-            rank_ker = linear_map.matrix.rank_ker()
-            rank_ker_dual = linear_map.dim_range - rank_im_dual
+            matrix = self.matrices[i]
+            rank_im = matrix.rank_im()
+            rank_ker = matrix.rank_ker()
             # Sum up bettis
             if i in output_dict.keys():
                 output_dict[i] += rank_ker
@@ -416,12 +450,7 @@ class ChainComplex(DGBase):
         output = 0
         for i in output_dict.keys():
             output += output_dict[i] * (POINCARE_POLY_VAR ** i)
-        # dual poly
-        output_dual = 0
-        for i in output_dual_dict.keys():
-            output_dual += output_dual_dict[i] * (POINCARE_POLY_VAR ** i)
-        self.poincare_poly = output
-        self.poincare_poly_dual = output_dual
+        self._poincare_poly = output
 
 
 class DGA(DGBase):
@@ -549,10 +578,9 @@ class DGA(DGBase):
                     gradings=self.gradings,
                     differentials=bilin_diff,
                     grading_mod=self.grading_mod,
-                    coeff_mod=self.coeff_mod
+                    coeff_mod=self.coeff_mod,
                 )
-                self.bilin_polys[(i,j)] = cx.poincare_poly
-                self.bilin_polys_dual[(i,j)] = cx.poincare_poly_dual
+                self.bilin_polys[(i,j)] = cx.get_poincare_poly()
                 bilin_counter += 1
                 LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
         self.lin_poly_list = sorted(

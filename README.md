@@ -129,7 +129,6 @@ I cannot guarantee that this is not a bad idea!
 
 ## Features
 
-- Need to update REF computations to RREF if we want to reasonably compute spectral sequences.
 - Compute spectral sequence polynomials to improve poincare polynomials.
 - Normalized euler characteristic and normalized augmentation count.
 - Compute the full augmentation tree?

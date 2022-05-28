@@ -301,6 +301,40 @@ class TestMatrix(unittest.TestCase):
             )
         )
 
+    def test_ref_methods(self):
+        ref_q = algebra.Matrix([[1, 0], [1, 1]], coeff_mod=2)
+        ref_q_inv = ref_q
+        ref = algebra.Matrix([[1, 1, 1, 0], [0, 1, 0, 0]], coeff_mod=2)
+        mat = ref_q_inv.multiply(ref)
+        mat.set_row_echelon()
+        self.assertTrue(np.array_equal(ref.values, mat.ref.values))
+        self.assertTrue(np.array_equal(ref_q_inv.values, mat.ref_q_inv.values))
+        self.assertTrue(np.array_equal(ref_q.values, mat.ref_q.values))
+
+        ref_q = algebra.Matrix([[1, 0], [1, 1]], coeff_mod=2)
+        ref_q_inv = ref_q
+        ref = algebra.Matrix([[1, 0, 1, 0], [0, 1, 0, 0]], coeff_mod=2)
+        mat = ref_q_inv.multiply(ref)
+        mat.set_red_row_echelon()
+        self.assertTrue(np.array_equal(ref.values, mat.ref.values))
+        self.assertTrue(np.array_equal(ref_q_inv.values, mat.ref_q_inv.values))
+        self.assertTrue(np.array_equal(ref_q.values, mat.ref_q.values))
+
+    def test_kernel(self):
+        mat = algebra.Matrix([[0, 1], [0, 0]])
+        ker = mat.kernel()
+        self.assertEqual(len(ker), 1)
+        self.assertTrue(np.array_equal([1, 0], ker[0]))
+
+        mat = algebra.Matrix([[1, 5], [0, 0]])
+        ker = mat.kernel()
+        self.assertEqual(len(ker), 1)
+        self.assertTrue(np.array_equal([-5, 1], ker[0]))
+
+        mat = algebra.Matrix(np.zeros([2, 2]))
+        ker = mat.kernel()
+        self.assertEqual(len(ker), 2)
+
 
 class TestDGA(unittest.TestCase):
 
