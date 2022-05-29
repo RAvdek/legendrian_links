@@ -4,7 +4,7 @@ An interactive application for analyzing Legendrian links. This project is curre
 
 Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra and be able to handle heavy computations. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
 
-The program computes augmentations of LCH algebras as well as for a version of Legendrian RSFT (which is not on the arXiv yet). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
+The program computes augmentations of LCH algebras as well as for a the [planar diagram algebra](https://arxiv.org/abs/2205.13031). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
 
 # Installation
 

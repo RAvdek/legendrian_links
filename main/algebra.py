@@ -308,27 +308,46 @@ class LinearMap(object):
         self.range_symbols = range_symbols
         self.coeff_mod = coeff_mod
         self._set_dims()
-        self._set_input_vars()
+        self._set_domain_symbols()
         self._set_matrix()
+        self._kernel = None
 
     def __repr__(self):
         return str(self.coeff_dict)
 
+    def rank_ker(self):
+        return self.matrix.rank_ker()
+
+    def rank_im(self):
+        return self.matrix.rank_im()
+
+    def kernel(self):
+        if self._kernel is None:
+            mat_ker = self.matrix.kernel()
+            output = list()
+            for v in mat_ker:
+                v_out = 0
+                for i in range(self.dim_domain):
+                    v_out += v[i] * self.domain_symbols[i]
+                output.append(v_out)
+            self._kernel = output
+        return self._kernel
+
     def _set_dims(self):
-        self.dim_dom = len(self.coeff_dict.keys())
+        self.dim_domain = len(self.coeff_dict.keys())
         self.dim_range = len(self.range_symbols)
 
-    def _set_input_vars(self):
+    def _set_domain_symbols(self):
         """Encode input and output symbols as `onehot` vectors so that they could be turned into a matrix"""
-        self.input_vars = list(self.coeff_dict.keys())
+        self.domain_symbols = list(self.coeff_dict.keys())
 
     def _set_matrix(self):
         # The dtype should be essential to avoid float arithmetic errors
-        values = np.zeros((len(self.range_symbols), len(self.input_vars)), dtype=np.integer)
-        for i in range(len(self.input_vars)):
+        values = np.zeros((len(self.range_symbols), len(self.domain_symbols)), dtype=np.integer)
+        for i in range(len(self.domain_symbols)):
             for j in range(len(self.range_symbols)):
                 temp_subs = {s: 0 if s != self.range_symbols[j] else 1 for s in self.range_symbols}
-                value = sympy.sympify(self.coeff_dict[self.input_vars[i]]).subs(temp_subs)
+                value = sympy.sympify(self.coeff_dict[self.domain_symbols[i]]).subs(temp_subs)
                 values[j][i] = value
         self.matrix = Matrix(values=values, coeff_mod=self.coeff_mod)
 
@@ -352,6 +371,15 @@ class DGBase(object):
         self._verify_init_args()
         self._correct_gradings()
         self._correct_filtration_levels()
+        self._set_min_max_gradings()
+
+    def get_generators_by_grading(self, grading):
+        return [k for k, v in self.gradings.items() if v == grading]
+
+    def get_generators_by_filtration(self, filtration):
+        if self.filtration_levels is None:
+            raise ValueError("Trying to access filtration levels where there are none")
+        return [k for k, v in self.filtration_levels.items() if v == filtration]
 
     def reduced(self, ceoff_mod, grading_mod):
         if self.coeff_mod % ceoff_mod != 0:
@@ -365,12 +393,17 @@ class DGBase(object):
             grading_mod=grading_mod
         )
 
+    def _set_min_max_gradings(self):
+        grading_values = set(self.gradings.values())
+        self.max_grading = max(grading_values)
+        self.min_grading = min(grading_values)
+
     def _correct_filtration_levels(self):
         if self.filtration_levels is None:
             self.filtration_levels = {k: 1 for k in self.gradings.keys()}
-            self.max_filtration_level = 1
+            self.max_filtration = 1
             return
-        self.max_filtration_level = max(self.filtration_levels.values())
+        self.max_filtration = max(self.filtration_levels.values())
 
     def _verify_init_args(self):
         if self.coeff_mod != 0:
@@ -399,8 +432,21 @@ class ChainComplex(DGBase):
             grading_mod=grading_mod
         )
         self._verify_linear_differentials()
-        self._set_matrices()
+        self._set_linear_maps()
         self._poincare_poly = None
+        self._homology_basis = None
+
+    def homology_basis(self):
+        raise NotImplementedError()
+        if self.grading_mod != 0:
+            raise NotImplementedError("homology_basis only available for Z graded complexes")
+        current_grading = self.max_grading
+        while current_grading >= self.min_grading:
+            previous_grading = current_grading + 1
+            if previous_grading not in self.linear_maps.keys():
+                previous_q = Matrix(np.identity(self.linear_maps[current_grading].dim_domain))
+                previous_q_inv = Matrix(np.identity(self.linear_maps[current_grading].dim_domain))
+            current_matrix = self.linear_maps[current_grading]
 
     def get_poincare_poly(self):
         if self._poincare_poly is None:
@@ -409,13 +455,13 @@ class ChainComplex(DGBase):
 
     def set_poincare_poly(self):
         output_dict = dict()
-        for i in self.matrices.keys():
+        for i in self.linear_maps.keys():
             i_min_1 = i - 1
             if self.grading_mod != 0:
                 i_min_1 %= self.grading_mod
-            matrix = self.matrices[i]
-            rank_im = matrix.rank_im()
-            rank_ker = matrix.rank_ker()
+            linear_map = self.linear_maps[i]
+            rank_im = linear_map.rank_im()
+            rank_ker = linear_map.rank_ker()
             # Sum up bettis
             if i in output_dict.keys():
                 output_dict[i] += rank_ker
@@ -436,9 +482,9 @@ class ChainComplex(DGBase):
             if not v.is_linear():
                 raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
 
-    def _set_matrices(self):
+    def _set_linear_maps(self):
         # We have to use a dictionary because the degrees may be non-positive
-        self.matrices = dict()
+        self.linear_maps = dict()
         for i in self.gradings.values():
             i_min_1 = i - 1
             if self.grading_mod != 0:
@@ -446,11 +492,11 @@ class ChainComplex(DGBase):
             range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
             domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
             diffs = {s: self.differentials[s].expression for s in domain_symbols}
-            self.matrices[i] = LinearMap(
+            self.linear_maps[i] = LinearMap(
                 coeff_dict=diffs,
                 range_symbols=range_symbols,
                 coeff_mod=self.coeff_mod
-            ).matrix
+            )
 
 
 class SpectralSequence(DGBase):
