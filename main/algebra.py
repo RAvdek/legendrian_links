@@ -115,8 +115,11 @@ class Matrix(object):
         if not self.coeff_mod == other.coeff_mod:
             raise ValueError(f"Trying to multiply matrix having coeff_modulus={self.coeff_mod} "
                              f"with other having coeff_modulus={other.coeff_mod}")
-        values = np.matmul(self.values, other.values)
+        values = np.dot(self.values, other.values)
         return Matrix(values=values, coeff_mod=self.coeff_mod)
+
+    def multiply_array(self, array):
+        return np.dot(self.values, array)
 
     def rank_im(self):
         if self.n_rows == 0 or self.n_cols == 0:
@@ -321,15 +324,22 @@ class LinearMap(object):
     def rank_im(self):
         return self.matrix.rank_im()
 
+    def array_to_domain_expression(self, array):
+        array_len = len(array)
+        n_symbols = len(self.domain_symbols)
+        if not array_len == n_symbols:
+            raise ValueError(f"Trying to get expression for len(array)={array_len} from {n_symbols} symbols")
+        v_out = 0
+        for i in range(self.dim_domain):
+            v_out += array[i] * self.domain_symbols[i]
+        return v_out
+
     def kernel(self):
         if self._kernel is None:
             mat_ker = self.matrix.kernel()
             output = list()
             for v in mat_ker:
-                v_out = 0
-                for i in range(self.dim_domain):
-                    v_out += v[i] * self.domain_symbols[i]
-                output.append(v_out)
+                output.append(self.array_to_domain_expression(v))
             self._kernel = output
         return self._kernel
 
@@ -437,16 +447,42 @@ class ChainComplex(DGBase):
         self._homology_basis = None
 
     def homology_basis(self):
-        raise NotImplementedError()
+        """Return a basis of homology as a dictionary,
+        [grading] -> [list of vectors given as linear combinations of symbols]
+        If there are no generators of a given grading, there will be no corresponding key in the dict.
+        Only available for Z graded complexes
+
+        :return: dict
+        """
         if self.grading_mod != 0:
             raise NotImplementedError("homology_basis only available for Z graded complexes")
+        if self._homology_basis is not None:
+            return self._homology_basis
+        output = dict()
         current_grading = self.max_grading
+        previous_ref_q = None
+        previous_im_rank = 0
         while current_grading >= self.min_grading:
-            previous_grading = current_grading + 1
-            if previous_grading not in self.linear_maps.keys():
-                previous_q = Matrix(np.identity(self.linear_maps[current_grading].dim_domain))
-                previous_q_inv = Matrix(np.identity(self.linear_maps[current_grading].dim_domain))
-            current_matrix = self.linear_maps[current_grading]
+            current_matrix = self.linear_maps[current_grading].matrix
+            if previous_ref_q is not None:
+                current_matrix = current_matrix.multiply(previous_ref_q)
+            # throw out the first columns which correspond to image of the previous del and compute RREF
+            modified_matrix = Matrix(current_matrix.values[:, (current_matrix.n_cols - previous_im_rank):])
+            modified_matrix.set_red_row_echelon()
+            modified_kernel = modified_matrix.kernel()
+            # place zeros in front of the kernel elements then convert back to current_matrix basis
+            z_block = np.zeros(previous_im_rank)
+            kernel = [np.concatenate((z_block, v)) for v in modified_kernel]
+            if previous_ref_q is not None:
+                kernel = [previous_ref_q.array_multiply(v) for v in modified_kernel]
+            # now convert kernel array elements back to sympy expressions
+            kernel = [self.linear_maps[current_grading].array_to_domain_expression(v) for v in kernel]
+            output[current_grading] = kernel
+            # set up for next iteration
+            if current_grading - 1 in self.linear_maps.keys():
+                previous_ref_q = modified_matrix.ref_q
+        self._homology_basis = output
+        return self._homology_basis
 
     def get_poincare_poly(self):
         if self._poincare_poly is None:
@@ -500,6 +536,7 @@ class ChainComplex(DGBase):
 
 
 class SpectralSequence(DGBase):
+    """Spectral sequence associated to a filtered chain complex."""
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         super(SpectralSequence, self).__init__(
@@ -509,11 +546,13 @@ class SpectralSequence(DGBase):
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
-        self._filtered_vars = None
-        self._filtered_diffs = None
+        if grading_mod != 0:
+            raise NotImplementedError("Spectral sequences only implemented for Z graded complexes")
+        self._set_filtered_vars()
+        self._set_filtered_differentials()
         self._poincare_poly = None
 
-    def set_filtered_vars(self):
+    def _set_filtered_vars(self):
         filtration_values = self.filtration_levels.values
         max_filt = max(filtration_values)
         min_filt = min(filtration_values)
@@ -522,7 +561,7 @@ class SpectralSequence(DGBase):
             filtered_vars[i] = [k for k, v in self.filtration_levels.items() if v == i]
         self._filtered_vars = filtered_vars
 
-    def set_filtered_differentials(self):
+    def _set_filtered_differentials(self):
         diffs = dict()
         for i in list(self._filtered_vars.keys()):
             for j in [f for f in list(self._filtered_vars.keys()) if f <= i]:
