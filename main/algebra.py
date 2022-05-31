@@ -87,6 +87,7 @@ class Matrix(object):
         self._kernel = None
         self._rank_im = None
         self._rank_ker = None
+        self._det = None
 
     def __repr__(self):
         return str(self.values)
@@ -100,6 +101,7 @@ class Matrix(object):
             self.ref_q_inv = self
             self._rank_im = 0
             self._rank_ker = 0
+            self._det = 0
             return
         else:
             raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
@@ -177,6 +179,8 @@ class Matrix(object):
         self.ref_pivot_indices = pivot_indices
         self.ref_free_indices = free_indices
         self.ref_form = self.REF
+        if self.n_rows == self.n_cols:
+            self._det = utils.prod([self.ref_q.values[k, k] for k in range(self.n_cols)]) % self.coeff_mod
 
     def set_red_row_echelon(self):
         """Override the ref variables with variables associated to reduced row echelon form
@@ -216,6 +220,20 @@ class Matrix(object):
 
     def is_square(self):
         return self.n_rows == self.n_cols
+
+    def det(self):
+        if self.n_rows != self.n_cols:
+            return ValueError("Trying to compute det of non-square matrix")
+        if self._det is None:
+            self.set_row_echelon()
+        return self._det
+
+    def get_inverse(self):
+        if self.n_rows != self.n_cols:
+            return ValueError("Trying to invert non-square matrix")
+        if self.det() == 0:
+            raise ValueError("Trying to invert non-invertible matrix")
+        return self.ref_q_inv
 
     def _row_reduce(self, ref, ref_q, ref_q_inv, k, l):
         while np.any(ref[k + 1:, l]):
@@ -535,6 +553,56 @@ class ChainComplex(DGBase):
             )
 
 
+class MatrixChainComplex(object):
+    """Chain complex determined by a pair of dictionaries
+
+    ranks[deg] -> number of generators of degree deg space
+    differentials[deg] -> if ranks[deg] & ranks[deg - 1] are both non-zero, then gives differential as a Matrix
+    """
+
+    def __init__(self, ranks, differentials, coeff_mod):
+        self.ranks = ranks
+        self.coeff_mod = coeff_mod
+        if self.coeff_mod != 0:
+            if not sympy.isprime(self.coeff_mod):
+                raise ValueError(f"Coefficient modulus {self.coeff_mod} is not 0 or prime")
+        self.differentials = differentials
+        for d in differentials.values():
+            if not isinstance(d, Matrix):
+                raise ValueError(f"Differential {d} is not a matrix")
+            if not d.coeff_mod == self.coeff_mod:
+                raise ValueError(f"Coeff_mods disagree {d.coeff_mod} != {self.coeff_mod}.")
+        self.max_grading = max(ranks.keys())
+        self.min_grading = min(ranks.keys())
+
+    def set_q_decomposition(self):
+        current_grading = self.max_grading
+        q_decomposition = dict()
+        previous_ref_q = None
+        previous_im_rank = 0
+        while current_grading >= self.min_grading:
+            current_matrix = self.differentials[current_grading]
+            if previous_ref_q is not None:
+                current_matrix = current_matrix.multiply(previous_ref_q)
+            # throw out the first columns which correspond to image of the previous del and compute RREF
+            modified_matrix = Matrix(current_matrix.values[:, (current_matrix.n_cols - previous_im_rank):])
+            modified_matrix.set_red_row_echelon()
+            q_decomposition[current_grading] = {
+                "left_modified": modified_matrix
+            }
+            # set up for next iteration
+            if current_grading - 1 in self.differentials.keys():
+                previous_ref_q = modified_matrix.ref_q
+            current_grading -= 1
+        for i in q_decomposition.keys():
+            left_right_modified = q_decomposition[i]["left_modified"]
+            if i-1 in q_decomposition.keys():
+                left_right_modified = q_decomposition[i-1]["left_modified"].ref_q_inv.multiply(left_right_modified)
+            q_decomposition[i]["left_right_modified"] = left_right_modified
+
+
+
+
 class SpectralSequence(DGBase):
     """Spectral sequence associated to a filtered chain complex."""
 
@@ -551,6 +619,13 @@ class SpectralSequence(DGBase):
         self._set_filtered_vars()
         self._set_filtered_differentials()
         self._poincare_poly = None
+
+    def poincare_poly(self):
+        if self._poincare_poly is not None:
+            return self._poincare_poly
+        page = 0
+        while page <= self.max_filtration:
+            page += 1
 
     def _set_filtered_vars(self):
         filtration_values = self.filtration_levels.values
