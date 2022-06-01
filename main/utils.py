@@ -153,6 +153,12 @@ def one_hot_array(i, shape):
     return output
 
 
+# sympy has difficulty with equality
+
+def poly_equal(p1, p2):
+    return sympy.expand(p1 - p2) == 0
+
+
 # math helper functions
 
 def num_inverse(n, coeff_mod):

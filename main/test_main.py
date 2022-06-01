@@ -340,6 +340,126 @@ class TestMatrix(unittest.TestCase):
         self.assertEqual(len(ker), 2)
 
 
+class TestMatrixChainComplex(unittest.TestCase):
+
+    def test_trivial(self):
+        ranks = {0: 1}
+        differentials = dict()
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=2)
+        self.assertEqual(cx.poincare_poly(), 1)
+
+    def test_stabilization(self):
+        ranks = {0: 1, 1: 1}
+        differentials = {1: algebra.Matrix([[1]], coeff_mod=0)}
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=0)
+        self.assertEqual(cx.poincare_poly(), 0)
+
+    def test_circle(self):
+        ranks = {0: 1, 1: 1}
+        differentials = {1: algebra.Matrix([[0]], coeff_mod=0)}
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=0)
+        self.assertEqual(cx.poincare_poly(), 1 + algebra.DEGREE_VAR)
+
+    def test_rp2(self):
+        ranks = {0: 1, 1: 1, 2: 1}
+        differentials = {
+            2: algebra.Matrix([[2]], coeff_mod=0),
+            1: algebra.Matrix([[0]], coeff_mod=0)
+        }
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=0)
+        self.assertEqual(cx.poincare_poly(), 1)
+
+        ranks = {0: 1, 1: 1, 2: 1}
+        differentials = {
+            2: algebra.Matrix([[2]], coeff_mod=2),
+            1: algebra.Matrix([[0]], coeff_mod=2)
+        }
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=2)
+        self.assertEqual(cx.poincare_poly(), 1 + algebra.DEGREE_VAR + algebra.DEGREE_VAR ** 2)
+
+    def test_non_diag(self):
+        ranks = {0: 1, 1: 2}
+        differentials = {
+            1: algebra.Matrix([[1, 0]], coeff_mod=0)
+        }
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=0)
+        self.assertEqual(cx.poincare_poly(), algebra.DEGREE_VAR)
+
+        ranks = {0: 2, 1: 2}
+        differentials = {
+            1: algebra.Matrix([[1, 0], [0, 0]], coeff_mod=0)
+        }
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=0)
+        self.assertEqual(cx.poincare_poly(), 1 + algebra.DEGREE_VAR)
+
+        ranks = {0: 2, 1: 2}
+        differentials = {
+            1: algebra.Matrix([[0, 1], [0, 0]], coeff_mod=0)
+        }
+        cx = algebra.MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=0)
+        cx.set_qrs_decomposition()
+        self.assertEqual(cx.poincare_poly(), 1 + algebra.DEGREE_VAR)
+
+
+class TestSpectralSequence(unittest.TestCase):
+
+    def test_trivial(self):
+        x = sympy.symbols('x')
+        gradings = {x: 0}
+        differentials = {x: algebra.Differential(0, coeff_mod=0)}
+        filtration_levels = {x: 1}
+        specseq = algebra.SpectralSequence(
+            gradings=gradings, differentials=differentials, filtration_levels=filtration_levels, coeff_mod=0)
+        p_poly = specseq.poincare_poly()
+        self.assertEqual(p_poly, algebra.FILTRATION_VAR)
+
+    def test_circle(self):
+        # Morse function on a circle
+        n, s = sympy.symbols('n, s')
+        gradings = {n: 1, s: 0}
+        differentials = {
+            n: algebra.Differential(0, coeff_mod=0),
+            s: algebra.Differential(0, coeff_mod=0)}
+        filtration_levels = {n: 1, s: 1}
+        specseq = algebra.SpectralSequence(
+            gradings=gradings, differentials=differentials, filtration_levels=filtration_levels, coeff_mod=0)
+        p_poly = specseq.poincare_poly()
+        self.assertTrue(utils.poly_equal(p_poly, algebra.FILTRATION_VAR * (1 + algebra.DEGREE_VAR)))
+
+    def test_sphere(self):
+        # Morse function with a pair of critical points on S2 for north and south poles
+        n, s = sympy.symbols('n, s')
+        gradings = {n: 2, s: 0}
+        differentials = {
+            n: algebra.Differential(0, coeff_mod=0),
+            s: algebra.Differential(0, coeff_mod=0)}
+        filtration_levels = {n: 2, s: 1}
+        specseq = algebra.SpectralSequence(
+            gradings=gradings, differentials=differentials, filtration_levels=filtration_levels, coeff_mod=0)
+        p_poly = specseq.poincare_poly()
+        expected = (
+                (algebra.PAGE_VAR + 1) * algebra.FILTRATION_VAR
+                * (1 + algebra.FILTRATION_VAR * algebra.DEGREE_VAR ** 2)
+        )
+        self.assertTrue(utils.poly_equal(p_poly, expected))
+
+    def test_heart_sphere(self):
+        # Try the heart shaped sphere, wth one of the humps higher than the other
+        w, x, y, z = sympy.symbols('w,x,y,z')
+        gradings = {w: 2, x: 2, y: 1, z: 0}
+        differentials = {
+            w: algebra.Differential(y, coeff_mod=2),
+            x: algebra.Differential(y, coeff_mod=2),
+            y: algebra.Differential(0, coeff_mod=2),
+            z: algebra.Differential(0, coeff_mod=2)}
+        filtration_levels = {w: 4, x: 3, y: 2, z: 1}
+        specseq = algebra.SpectralSequence(
+            gradings=gradings, differentials=differentials, filtration_levels=filtration_levels, coeff_mod=2)
+        p_poly = specseq.poincare_poly()
+        LOG.info(f"Heart sphere poly = {p_poly}")
+        # TODO: Compute this for real
+        self.assertNotEqual(p_poly, 0)
+
 class TestDGA(unittest.TestCase):
 
     def test_pickle(self):

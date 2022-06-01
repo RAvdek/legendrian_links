@@ -6,9 +6,9 @@ import utils
 import polynomials
 
 LOG = utils.LOG
-DEGREE_VAR = sympy.Symbol('t')
-FILTRATION_VAR = sympy.Symbol('p')
-PAGE_VAR = sympy.Symbol('r')
+PAGE_VAR = sympy.Symbol('r', commutative=True)
+FILTRATION_VAR = sympy.Symbol('p', commutative=True)
+DEGREE_VAR = sympy.Symbol('t', commutative=True)
 
 
 class Differential(object):
@@ -70,14 +70,17 @@ class Matrix(object):
     def __init__(self, values, coeff_mod=0):
         self.values = np.array(values)
 
+        self.n_rows = self.values.shape[0]
+        self.n_cols = self.values.shape[1]
+        self.coeff_mod = coeff_mod
+        self._wierd_shape = False
+
         wrong_shape = len(self.values.shape) != 2
+        wrong_shape |= self.values.shape[0] == 0
         if wrong_shape:
             self._init_wrong_shape()
             return
 
-        self.n_rows = self.values.shape[0]
-        self.n_cols = self.values.shape[1]
-        self.coeff_mod = coeff_mod
         if coeff_mod != 0:
             self.values %= self.coeff_mod
         self.ref_form = None
@@ -94,16 +97,23 @@ class Matrix(object):
     def __repr__(self):
         return str(self.values)
 
+    def __mul__(self, other):
+        """Allows us to use X * Y with X a matrix and Y a matrix or array"""
+        if isinstance(other, Matrix):
+            return self.multiply(other)
+        return self.multiply_array(other)
+
     def _init_wrong_shape(self):
+        self._wierd_shape = True
         if self.values.shape[0] == 0:
-            self.n_rows = 0
-            self.n_cols = 0
             self.ref = self
             self.ref_q = self
             self.ref_q_inv = self
             self._rank_im = 0
-            self._rank_ker = 0
+            self._rank_ker = self.n_cols
             self._det = 0
+            self.ref_pivot_indices = list()
+            self.ref_free_indices = list(range(self.n_cols))
             return
         else:
             raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
@@ -151,6 +161,8 @@ class Matrix(object):
 
         :return: None
         """
+        if self._wierd_shape:
+            return
         ref = self.values.copy()
         ref_q = np.identity(self.n_rows)
         ref_q_inv = np.identity(self.n_rows)
@@ -187,7 +199,10 @@ class Matrix(object):
         self.ref_free_indices = free_indices
         self.ref_form = self.REF
         if self.n_rows == self.n_cols:
-            self._det = utils.prod([self.ref_q.values[k, k] for k in range(self.n_cols)]) % self.coeff_mod
+            det = utils.prod([self.ref_q.values[k, k] for k in range(self.n_cols)])
+            if self.coeff_mod != 0:
+                det %= self.coeff_mod
+            self._det = det
 
     def set_red_row_echelon(self):
         """Override the ref variables with variables associated to reduced row echelon form,
@@ -195,6 +210,8 @@ class Matrix(object):
 
         :return: None
         """
+        if self._wierd_shape:
+            return
         if self.ref is None:
             self.set_row_echelon()
         ref, ref_q, ref_q_inv = self.ref.values, self.ref_q.values, self.ref_q_inv.values
@@ -532,11 +549,7 @@ class MatrixChainComplex(object):
             if not sympy.isprime(self.coeff_mod):
                 raise ValueError(f"Coefficient modulus {self.coeff_mod} is not 0 or prime")
         self.differentials = differentials
-        for d in differentials.values():
-            if not isinstance(d, Matrix):
-                raise ValueError(f"Differential {d} is not a matrix")
-            if not d.coeff_mod == self.coeff_mod:
-                raise ValueError(f"Coeff_mods disagree {d.coeff_mod} != {self.coeff_mod}.")
+        self._validate_differentials()
         self.max_grading = max(ranks.keys())
         self.min_grading = min(ranks.keys())
         self._poincare_poly = None
@@ -586,6 +599,7 @@ class MatrixChainComplex(object):
             gr_plus_1 = grading + 1 % self.grading_mod
         return self.rank_ker(grading) - self.rank_im(gr_plus_1)
 
+    @utils.log_start_stop
     def set_qrs_decomposition(self):
         """Compute qrs decomposition of the chain complex. Requires complex to be Z-graded"""
         if self.grading_mod != 0:
@@ -602,35 +616,46 @@ class MatrixChainComplex(object):
         while current_grading >= self.min_grading:
             # current_matrix = M_n
             current_matrix = self.differentials.get(current_grading)
-            if current_matrix is None:
+            if current_matrix is None or 0 in current_matrix.values.shape or current_matrix.n_cols == previous_im_rank:
                 dim_ims[current_grading] = 0
                 dim_kers[current_grading] = self.ranks.get(current_grading, 0)
+                current_grading -= 1
                 continue
 
             # Set current matrix to M_n Q_{n+1}
             if previous_ref_q is not None:
-                current_matrix = current_matrix.multiply(previous_ref_q)
+                current_matrix = current_matrix * previous_ref_q
 
             # compute Q_n, R_n so that Q_n R_n = M_n Q_{n+1}
             # throw out the first columns of M_n Q_{n+1} which correspond to image of the previous del and compute RREF
             # We have to add back in the thrown out columns to recover R_n
-            truncated_matrix = Matrix(current_matrix.values[:, (current_matrix.n_cols - previous_im_rank):])
+            truncated_matrix = Matrix(
+                current_matrix.values[:, (current_matrix.n_cols - previous_im_rank - 1):],
+                coeff_mod=self.coeff_mod
+            )
             truncated_matrix.set_red_row_echelon()
             dim_ims[current_grading] = truncated_matrix.rank_im()
             dim_kers[current_grading] = previous_im_rank + truncated_matrix.rank_ker()
+            if previous_im_rank > 0:
+                expanded_ref = Matrix(
+                    np.concatenate(
+                        (np.zeros((current_matrix.n_rows, previous_im_rank)), truncated_matrix.ref_q), axis=1),
+                    coeff_mod=self.coeff_mod
+                )
+            else:
+                expanded_ref = truncated_matrix.ref_q
+            # Update gradings
             qrs_decomposition[current_grading] = {
                 "ref_q": truncated_matrix.ref_q,
                 "ref_q_inv": truncated_matrix.ref_q_inv,
-                "ref": Matrix(
-                    np.concatenate((np.zeros((current_matrix.n_rows, previous_im_rank)),truncated_matrix.ref_q)),
-                    coeff_mod=self.coeff_mod)
+                "ref": expanded_ref
             }
 
             # compute the S_n matrix
             s_matrix_rows = []
             # kernels for the truncated R_n matrix, upgraded to have the correct dimension
             for v in truncated_matrix.kernel():
-                s_matrix_rows.append(np.concatenate(np.zeros((previous_im_rank, v)), axis=0))
+                s_matrix_rows.append(np.concatenate((np.zeros(previous_im_rank), v), axis=0))
             # vectors spanning image of the previous differential
             for i in range(previous_im_rank):
                 s_matrix_rows.append(utils.one_hot_array(i, current_matrix.n_cols))
@@ -648,6 +673,19 @@ class MatrixChainComplex(object):
             current_grading -= 1
         self.qrs_decomposition = qrs_decomposition
 
+    def _validate_differentials(self):
+        for k, d in self.differentials.items():
+            if not isinstance(d, Matrix):
+                raise ValueError(f"Differential {d} is not a matrix")
+            if not d.coeff_mod == self.coeff_mod:
+                raise ValueError(f"Coeff_mods disagree {d.coeff_mod} != {self.coeff_mod}.")
+            if d.n_cols != self.ranks[k]:
+                raise ValueError(f"Differential at degree {k} "
+                                 f"has n_cols={d.n_cols} != self.ranks[k] = {self.ranks[k]}")
+            if d.n_rows != self.ranks.get(k-1, 0):
+                raise ValueError(f"Differential at degree k={k} "
+                                 f"has n_rows={d.n_rows} != self.ranks[k-1] = {self.ranks.get(k-1, 0)}")
+
 
 class SpectralSequence(DGBase):
     """Spectral sequence associated to a filtered chain complex. Only available for Z-gradings (grading_mod=0)"""
@@ -661,45 +699,139 @@ class SpectralSequence(DGBase):
             grading_mod=grading_mod
         )
         self._verify_z_grading()
-        self._set_filtered_vars()
-        self._set_filtered_differentials()
+        self._rank_homology = None
         self._poincare_poly = None
+        self._matrices = None
 
+    @utils.log_start_stop
     def poincare_poly(self):
         if self._poincare_poly is not None:
             return self._poincare_poly
-        page = 0
-        while page <= self.max_filtration:
-            # TODO: fill in the details!
-            # set chain complexes at the page
-            # compute qrs decomposition of each complex
+
+        self._set_filtered_vars()
+        self._set_filtered_differentials()
+        self._set_initial_matrices()
+
+        # ranks[(filt, deg)] = # variables with prescribed filtration level and degree
+        ranks = {k: len(v) for k, v in self._filtered_vars.items()}
+        ranks = {k: v for k, v in ranks.items() if v != 0}
+        rank_homology = dict()
+        poincare_poly = 0
+        page_num = 0
+        while page_num <= self.max_filtration - 1:
+            LOG.info(f"Computing page={page_num} of spectral sequence")
+            LOG.info(poincare_poly)
+            LOG.info(ranks)
+            LOG.info(self._matrices)
+            # set chain complexes at the page, indexes by the p for which (deg=0, p) is in the chain
+            page_cxs = dict()
+            min_p = min(1, self.max_filtration - page_num * max(self.max_grading, 0))
+            max_p = max(1, self.max_filtration + page_num * self.max_grading + 1)
+            for p in range(min_p, max_p):
+                possible_indices = [
+                    (p + page_num * deg, deg)
+                    for deg in range(self.min_grading, self.max_grading + 1)
+                ]
+                min_deg = min([k[1] for k in possible_indices])
+                max_deg = max([k[1] for k in possible_indices])
+
+                differentials = {
+                    deg: self._matrices[(p + page_num * deg, p + page_num * (deg - 1), deg)]
+                    for deg in range(min_deg, max_deg + 1)
+                    if (p + page_num * deg, p + page_num * (deg - 1), deg) in self._matrices.keys()
+                }
+                cx_ranks = {
+                    deg: ranks.get((p + page_num * deg, deg), 0)
+                    for deg in range(self.min_grading, self.max_grading + 1)
+                }
+                try:
+                    page_cxs[p] = MatrixChainComplex(
+                        ranks=cx_ranks,
+                        differentials=differentials,
+                        coeff_mod=self.coeff_mod
+                    )
+                except Exception as e:
+                    LOG.info(f"failed MCC init at page_num={page_num}, p={p}")
+                    LOG.info(cx_ranks)
+                    LOG.info(differentials)
+                    raise e
+                # compute qrs decomposition of each complex
+                page_cxs[p].set_qrs_decomposition()
+                # add contributions to the specseq homology ranks and poincare polynomial
+                for deg in range(self.min_grading, self.max_grading + 1):
+                    filt = p + page_num * deg
+                    betti = page_cxs[p].rank_homology(deg)
+                    rank_homology[(page_num + 1, filt, deg)] = betti
+                    poincare_poly += betti * (DEGREE_VAR ** deg) * (FILTRATION_VAR ** filt) * (PAGE_VAR ** page_num)
+
+            # at this point we can throw out the matrices which are used for the current page
+            possible_triple_indices = [
+                (p + page_num * deg, p + page_num * (deg - 1), deg)
+                for deg in range(self.min_grading, self.max_grading + 1)
+                for p in range(1, self.max_grading + 1)
+            ]
+            ranks = {
+                (filt, deg): rank_homology.get((page_num + 1, filt, deg), 0)
+                for deg in range(self.min_grading, self.max_grading + 1)
+                for filt in range(1, self.max_filtration + 1)
+            }
+            ranks = {k: v for k, v in ranks.items() if v != 0}
+            self._matrices = {k: v for k, v in self._matrices.items() if k not in possible_triple_indices}
             # update self.matrices by applying matrix mult and slicing only the relevant indices
-            page += 1
+            for p in range(min_p, max_p):
+                for deg in range(self.min_grading, self.max_grading + 1):
+                    for p_target in range(1, p+1):
+                        mat = self._matrices.get((p, p_target, deg))
+                        if mat is None or 0 in mat.values.shape:
+                            continue
+                        # now replace mat with
+                        # S_{p_target, deg - 1} * Q_{p_target, deg}^{-1} * mat * Q_{p, deg+1} * S_{p, deg}^{-1}
+                        # and slice to get the first b^{r}_{p_target, deg-1} rows and first b^{r}_{p, deg} columns
+                        if p - page_num * (deg + 1) in page_cxs.keys():
+                            if deg in page_cxs[p - page_num * (deg + 1)].qrs_decomposition.keys():
+                                mat *= page_cxs[p - page_num * (deg + 1)].qrs_decomposition[deg]["ref_q"]
+                        if p - page_num * deg in page_cxs.keys():
+                            if deg in page_cxs[p - page_num * deg].qrs_decomposition.keys():
+                                mat *= page_cxs[p - page_num * deg].qrs_decomposition[deg]["s_inv"]
+                        if p - page_num * deg in page_cxs.keys():
+                            if deg in page_cxs[p - page_num * deg].qrs_decomposition.keys():
+                                mat = page_cxs[p - page_num * deg].qrs_decomposition[deg]["ref_q_inv"] * mat
+                        if p - page_num * (deg - 1) in page_cxs.keys():
+                            if deg in page_cxs[p - page_num * (deg - 1)].qrs_decomposition.keys():
+                                mat = page_cxs[p - page_num * (deg - 1)].qrs_decomposition[deg]["s"] * mat
+                        mat = mat.values[
+                              :rank_homology.get((page_num + 1, p_target, deg - 1), 0),
+                              :rank_homology.get((page_num + 1, p, deg), 0),
+                        ]
+                        self._matrices[p, p_target, deg] = Matrix(mat, coeff_mod=self.coeff_mod)
+            page_num += 1
+        self._poincare_poly = poincare_poly
+        return self._poincare_poly
 
     def _verify_z_grading(self):
         if self.grading_mod != 0:
             raise NotImplementedError("Spectral sequences only implemented for Z graded complexes")
 
     def _set_filtered_vars(self):
-        filtration_values = self.filtration_levels.values
+        filtration_values = self.filtration_levels.values()
         max_filt = max(filtration_values)
         min_filt = min(filtration_values)
         filtered_vars = dict()
-        for i in range(min_filt, max_filt + 1):
+        for filt_level in range(min_filt, max_filt + 1):
             for deg in range(self.min_grading, self.max_grading + 1):
-                fv = self.get_generators_by_filtration(i)
+                fv = self.get_generators_by_filtration(filt_level)
                 vars = [v for v in self.get_generators_by_grading(deg) if v in fv]
-                filtered_vars[(i, deg)] = sorted(vars, key=str)
+                filtered_vars[(filt_level, deg)] = sorted(vars, key=str)
         self._filtered_vars = filtered_vars
 
     def _set_filtered_differentials(self):
         """Sets filtered differentials as expressions"""
         diffs = dict()
         for i, deg in list(self._filtered_vars.keys()):
-            for j in [f for f in list(self._filtered_vars.keys()) if f <= i]:
+            for j in [f[0] for f in list(self._filtered_vars.keys()) if f[0] <= i]:
                 non_j_vars_subs = {k: 0 for k, v in self.filtration_levels.items() if v != j}
                 diffs[(i, j, deg)] = {
-                    k: v.subs(non_j_vars_subs)
+                    k: sympy.sympify(v.expression).subs(non_j_vars_subs)
                     for k, v in self.differentials.items()
                     if k in self._filtered_vars[(i, deg)]
                 }
@@ -711,12 +843,11 @@ class SpectralSequence(DGBase):
             i, j, deg = k
             linear_map = LinearMap(
                 coeff_dict=self._filtered_diffs[k],
-                range_symbols=self._filtered_vars.get((j, deg - 1), list())
+                range_symbols=self._filtered_vars.get((j, deg - 1), list()),
+                coeff_mod=self.coeff_mod
             )
             mats[k] = linear_map.matrix
-        self.matrices = mats
-
-
+        self._matrices = mats
 
 
 class DGA(DGBase):
@@ -833,7 +964,6 @@ class DGA(DGBase):
 
     @utils.log_start_stop
     def set_all_bilin(self):
-        # How frequently to log?
         bilin_counter = 0
         for i in range(self.n_augs):
             for j in range(self.n_augs):
