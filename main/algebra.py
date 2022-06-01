@@ -12,8 +12,7 @@ PAGE_VAR = sympy.Symbol('r')
 
 
 class Differential(object):
-    """Differential of a DGA element.
-    """
+    """Differential of a sympy symbol."""
 
     def __init__(self, expression, coeff_mod=2):
         self.expression = expression
@@ -23,6 +22,7 @@ class Differential(object):
         return str(self.expression)
 
     def is_linear(self):
+        """Returns True or False is the expression is linear"""
         return polynomials.is_linear(self.expression)
 
     def linearize(self, subs):
@@ -123,6 +123,11 @@ class Matrix(object):
         return Matrix(values=values, coeff_mod=self.coeff_mod)
 
     def multiply_array(self, array):
+        """Multiple self with a 1-d array.
+
+        :param array: 1-d array (list or numpy array)
+        :return: 1-d numpy array
+        """
         return np.dot(self.values, array)
 
     def rank_im(self):
@@ -142,7 +147,7 @@ class Matrix(object):
         return self._rank_ker
 
     def set_row_echelon(self):
-        """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
+        """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self. Sets self.ref_form = self.REF
 
         :return: None
         """
@@ -185,7 +190,8 @@ class Matrix(object):
             self._det = utils.prod([self.ref_q.values[k, k] for k in range(self.n_cols)]) % self.coeff_mod
 
     def set_red_row_echelon(self):
-        """Override the ref variables with variables associated to reduced row echelon form
+        """Override the ref variables with variables associated to reduced row echelon form,
+        Sets self.ref_form = self.RREF
 
         :return: None
         """
@@ -221,9 +227,11 @@ class Matrix(object):
         return self._kernel
 
     def is_square(self):
+        """Return True or False for if the matrix is square"""
         return self.n_rows == self.n_cols
 
     def det(self):
+        """Return determinant of matrix as element of Z/coeff_mod"""
         if self.n_rows != self.n_cols:
             return ValueError("Trying to compute det of non-square matrix")
         if self._det is None:
@@ -231,6 +239,7 @@ class Matrix(object):
         return self._det
 
     def get_inverse(self):
+        """Return inverse if it exists, otherwise raise ValueError"""
         if self.n_rows != self.n_cols:
             return ValueError("Trying to invert non-square matrix")
         if self.det() == 0:
@@ -325,6 +334,7 @@ class LinearMap(object):
     def __init__(self, coeff_dict, range_symbols, coeff_mod=2):
         """
         :param coeff_dict: Dict of the form {symbol: sympy expression}
+        :param range_symbols: Symbols of the target.
         :param coeff_mod: Coefficient modulus to use
         """
         self.coeff_dict = coeff_dict
@@ -369,7 +379,7 @@ class LinearMap(object):
 
     def _set_domain_symbols(self):
         """Encode input and output symbols as `onehot` vectors so that they could be turned into a matrix"""
-        self.domain_symbols = list(self.coeff_dict.keys())
+        self.domain_symbols = sorted(list(self.coeff_dict.keys()), key=str)
 
     def _set_matrix(self):
         # The dtype should be essential to avoid float arithmetic errors
@@ -412,6 +422,7 @@ class DGBase(object):
         return [k for k, v in self.filtration_levels.items() if v == filtration]
 
     def reduced(self, ceoff_mod, grading_mod):
+        """Return instance of self with coefficients and gradings reduced by new moduli"""
         if self.coeff_mod % ceoff_mod != 0:
             raise ValueError(f"New coefficient modulus {ceoff_mod} doesn't divide old modulus {self.coeff_mod}")
         if self.grading_mod % grading_mod != 0:
@@ -452,7 +463,10 @@ class DGBase(object):
 
 
 class ChainComplex(DGBase):
-    """Additive chain complex instantiated from sympy expressions for differentials"""
+    """Additive chain complex instantiated from sympy expressions for differentials.
+
+    Use this class to access chain complex homotopy invariants.
+    """
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         super(ChainComplex, self).__init__(
@@ -467,9 +481,11 @@ class ChainComplex(DGBase):
         self._poincare_poly = None
 
     def rank_homology(self, grading):
+        """:return: int rank of homology at specified grading degree"""
         return self.matrix_cx.rank_homology(grading)
 
     def poincare_poly(self):
+        """:return: sympy expression for poincare polynomial"""
         if self._poincare_poly is None:
             self._poincare_poly = self.matrix_cx.poincare_poly()
         return self._poincare_poly
@@ -529,6 +545,7 @@ class MatrixChainComplex(object):
         self.qrs_decomposition = None
 
     def poincare_poly(self):
+        """:return: sympy expression for poincare polynomial"""
         if self._poincare_poly is not None:
             return self._poincare_poly
         output = 0
@@ -542,6 +559,7 @@ class MatrixChainComplex(object):
         return self._poincare_poly
 
     def rank_im(self, grading):
+        """:return: int rank of image of differential at specified grading degree"""
         if grading in self._dim_ims.keys():
             return self._dim_ims[grading]
         if grading not in self.differentials.keys():
@@ -551,6 +569,7 @@ class MatrixChainComplex(object):
         return self._dim_ims[grading]
 
     def rank_ker(self, grading):
+        """:return: int rank of kernel of differential at specified grading degree"""
         if grading in self._dim_kers.keys():
             return self._dim_kers[grading]
         if grading not in self.differentials.keys():
@@ -560,6 +579,7 @@ class MatrixChainComplex(object):
         return self._dim_kers[grading]
 
     def rank_homology(self, grading):
+        """:return: int rank of homology at specified grading degree"""
         if self.grading_mod == 0:
             gr_plus_1 = grading + 1
         else:
@@ -630,9 +650,9 @@ class MatrixChainComplex(object):
 
 
 class SpectralSequence(DGBase):
-    """Spectral sequence associated to a filtered chain complex."""
+    """Spectral sequence associated to a filtered chain complex. Only available for Z-gradings (grading_mod=0)"""
 
-    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=2, grading_mod=0):
         super(SpectralSequence, self).__init__(
             gradings=gradings,
             differentials=differentials,
@@ -640,8 +660,7 @@ class SpectralSequence(DGBase):
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
-        if grading_mod != 0:
-            raise NotImplementedError("Spectral sequences only implemented for Z graded complexes")
+        self._verify_z_grading()
         self._set_filtered_vars()
         self._set_filtered_differentials()
         self._poincare_poly = None
@@ -651,7 +670,15 @@ class SpectralSequence(DGBase):
             return self._poincare_poly
         page = 0
         while page <= self.max_filtration:
+            # TODO: fill in the details!
+            # set chain complexes at the page
+            # compute qrs decomposition of each complex
+            # update self.matrices by applying matrix mult and slicing only the relevant indices
             page += 1
+
+    def _verify_z_grading(self):
+        if self.grading_mod != 0:
+            raise NotImplementedError("Spectral sequences only implemented for Z graded complexes")
 
     def _set_filtered_vars(self):
         filtration_values = self.filtration_levels.values
@@ -659,19 +686,37 @@ class SpectralSequence(DGBase):
         min_filt = min(filtration_values)
         filtered_vars = dict()
         for i in range(min_filt, max_filt + 1):
-            filtered_vars[i] = [k for k, v in self.filtration_levels.items() if v == i]
+            for deg in range(self.min_grading, self.max_grading + 1):
+                fv = self.get_generators_by_filtration(i)
+                vars = [v for v in self.get_generators_by_grading(deg) if v in fv]
+                filtered_vars[(i, deg)] = sorted(vars, key=str)
         self._filtered_vars = filtered_vars
 
     def _set_filtered_differentials(self):
+        """Sets filtered differentials as expressions"""
         diffs = dict()
-        for i in list(self._filtered_vars.keys()):
+        for i, deg in list(self._filtered_vars.keys()):
             for j in [f for f in list(self._filtered_vars.keys()) if f <= i]:
                 non_j_vars_subs = {k: 0 for k, v in self.filtration_levels.items() if v != j}
-                diffs[(i, j)] = {
+                diffs[(i, j, deg)] = {
                     k: v.subs(non_j_vars_subs)
-                    for k, v in self.differentials.items() if self.filtration_levels[k] == i
+                    for k, v in self.differentials.items()
+                    if k in self._filtered_vars[(i, deg)]
                 }
         self._filtered_diffs = diffs
+
+    def _set_initial_matrices(self):
+        mats = dict()
+        for k in self._filtered_diffs.keys():
+            i, j, deg = k
+            linear_map = LinearMap(
+                coeff_dict=self._filtered_diffs[k],
+                range_symbols=self._filtered_vars.get((j, deg - 1), list())
+            )
+            mats[k] = linear_map.matrix
+        self.matrices = mats
+
+
 
 
 class DGA(DGBase):
