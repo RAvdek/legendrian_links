@@ -26,6 +26,10 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(1, utils.num_inverse(1, 2))
         self.assertEqual(2, utils.num_inverse(3, 5))
 
+    def test_one_hot(self):
+        self.assertTrue(np.array_equal(utils.one_hot_array(1, 2), [0, 1]))
+        self.assertTrue(np.array_equal(utils.one_hot_array(3, 5), [0, 0, 0, 1, 0]))
+
 
 class TestLinks(unittest.TestCase):
 

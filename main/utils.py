@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import json
 import logging
+import numpy as np
 import random
 import signal
 import string
@@ -136,6 +137,20 @@ def rotate(array, n):
     """
     n %= len(array)
     return array[n:] + array[:n]
+
+
+# methods for numpy arrays
+
+def one_hot_array(i, shape):
+    """Return an array of size shape with zeros everywhere except having a one at index i
+
+    :param i: Index of the 1
+    :param shape: length of the array
+    :return: numpy array of vector shape
+    """
+    output = np.zeros(shape)
+    output[i] = 1
+    return output
 
 
 # math helper functions

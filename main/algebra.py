@@ -6,7 +6,9 @@ import utils
 import polynomials
 
 LOG = utils.LOG
-POINCARE_POLY_VAR = sympy.Symbol('t')
+DEGREE_VAR = sympy.Symbol('t')
+FILTRATION_VAR = sympy.Symbol('p')
+PAGE_VAR = sympy.Symbol('r')
 
 
 class Differential(object):
@@ -381,7 +383,7 @@ class LinearMap(object):
 
 
 class DGBase(object):
-    """Base class for differential graded objects"""
+    """Base class for differential graded objects which are instantiated using sympy expressions for differentials"""
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         """
@@ -450,6 +452,7 @@ class DGBase(object):
 
 
 class ChainComplex(DGBase):
+    """Additive chain complex instantiated from sympy expressions for differentials"""
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         super(ChainComplex, self).__init__(
@@ -460,97 +463,42 @@ class ChainComplex(DGBase):
             grading_mod=grading_mod
         )
         self._verify_linear_differentials()
-        self._set_linear_maps()
+        self._set_matrix_cx()
         self._poincare_poly = None
-        self._homology_basis = None
 
-    def homology_basis(self):
-        """Return a basis of homology as a dictionary,
-        [grading] -> [list of vectors given as linear combinations of symbols]
-        If there are no generators of a given grading, there will be no corresponding key in the dict.
-        Only available for Z graded complexes
+    def rank_homology(self, grading):
+        return self.matrix_cx.rank_homology(grading)
 
-        :return: dict
-        """
-        if self.grading_mod != 0:
-            raise NotImplementedError("homology_basis only available for Z graded complexes")
-        if self._homology_basis is not None:
-            return self._homology_basis
-        output = dict()
-        current_grading = self.max_grading
-        previous_ref_q = None
-        previous_im_rank = 0
-        while current_grading >= self.min_grading:
-            current_matrix = self.linear_maps[current_grading].matrix
-            if previous_ref_q is not None:
-                current_matrix = current_matrix.multiply(previous_ref_q)
-            # throw out the first columns which correspond to image of the previous del and compute RREF
-            modified_matrix = Matrix(current_matrix.values[:, (current_matrix.n_cols - previous_im_rank):])
-            modified_matrix.set_red_row_echelon()
-            modified_kernel = modified_matrix.kernel()
-            # place zeros in front of the kernel elements then convert back to current_matrix basis
-            z_block = np.zeros(previous_im_rank)
-            kernel = [np.concatenate((z_block, v)) for v in modified_kernel]
-            if previous_ref_q is not None:
-                kernel = [previous_ref_q.array_multiply(v) for v in modified_kernel]
-            # now convert kernel array elements back to sympy expressions
-            kernel = [self.linear_maps[current_grading].array_to_domain_expression(v) for v in kernel]
-            output[current_grading] = kernel
-            # set up for next iteration
-            if current_grading - 1 in self.linear_maps.keys():
-                previous_ref_q = modified_matrix.ref_q
-        self._homology_basis = output
-        return self._homology_basis
-
-    def get_poincare_poly(self):
+    def poincare_poly(self):
         if self._poincare_poly is None:
-            self.set_poincare_poly()
+            self._poincare_poly = self.matrix_cx.poincare_poly()
         return self._poincare_poly
-
-    def set_poincare_poly(self):
-        output_dict = dict()
-        for i in self.linear_maps.keys():
-            i_min_1 = i - 1
-            if self.grading_mod != 0:
-                i_min_1 %= self.grading_mod
-            linear_map = self.linear_maps[i]
-            rank_im = linear_map.rank_im()
-            rank_ker = linear_map.rank_ker()
-            # Sum up bettis
-            if i in output_dict.keys():
-                output_dict[i] += rank_ker
-            else:
-                output_dict[i] = rank_ker
-            if i_min_1 in output_dict.keys():
-                output_dict[i_min_1] -= rank_im
-            else:
-                output_dict[i_min_1] = -rank_im
-        # poincare poly
-        output = 0
-        for i in output_dict.keys():
-            output += output_dict[i] * (POINCARE_POLY_VAR ** i)
-        self._poincare_poly = output
 
     def _verify_linear_differentials(self):
         for k, v in self.differentials.items():
             if not v.is_linear():
                 raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
 
-    def _set_linear_maps(self):
-        # We have to use a dictionary because the degrees may be non-positive
-        self.linear_maps = dict()
-        for i in self.gradings.values():
+    def _set_matrix_cx(self):
+        differentials = dict()
+        ranks = dict()
+        if self.grading_mod != 0:
+            gradings = polynomials.finite_field_elements(self.grading_mod)
+        else:
+            gradings = range(self.min_grading, self.max_grading + 1)
+        for i in gradings:
             i_min_1 = i - 1
             if self.grading_mod != 0:
                 i_min_1 %= self.grading_mod
             range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
             domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
-            diffs = {s: self.differentials[s].expression for s in domain_symbols}
-            self.linear_maps[i] = LinearMap(
-                coeff_dict=diffs,
+            ranks[i] = len(domain_symbols)
+            differentials[i] = LinearMap(
+                coeff_dict={s: self.differentials[s].expression for s in domain_symbols},
                 range_symbols=range_symbols,
                 coeff_mod=self.coeff_mod
-            )
+            ).matrix
+        self.matrix_cx = MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=self.coeff_mod)
 
 
 class MatrixChainComplex(object):
@@ -560,8 +508,9 @@ class MatrixChainComplex(object):
     differentials[deg] -> if ranks[deg] & ranks[deg - 1] are both non-zero, then gives differential as a Matrix
     """
 
-    def __init__(self, ranks, differentials, coeff_mod):
+    def __init__(self, ranks, differentials, coeff_mod=2, grading_mod=0):
         self.ranks = ranks
+        self.grading_mod = grading_mod
         self.coeff_mod = coeff_mod
         if self.coeff_mod != 0:
             if not sympy.isprime(self.coeff_mod):
@@ -574,33 +523,110 @@ class MatrixChainComplex(object):
                 raise ValueError(f"Coeff_mods disagree {d.coeff_mod} != {self.coeff_mod}.")
         self.max_grading = max(ranks.keys())
         self.min_grading = min(ranks.keys())
+        self._poincare_poly = None
+        self._dim_kers = dict()
+        self._dim_ims = dict()
+        self.qrs_decomposition = None
 
-    def set_q_decomposition(self):
+    def poincare_poly(self):
+        if self._poincare_poly is not None:
+            return self._poincare_poly
+        output = 0
+        if self.grading_mod != 0:
+            gradings = polynomials.finite_field_elements(self.grading_mod)
+        else:
+            gradings = range(self.min_grading, self.max_grading + 1)
+        for grading in gradings:
+                output += self.rank_homology(grading) * (DEGREE_VAR ** grading)
+        self._poincare_poly = output
+        return self._poincare_poly
+
+    def rank_im(self, grading):
+        if grading in self._dim_ims.keys():
+            return self._dim_ims[grading]
+        if grading not in self.differentials.keys():
+            self._dim_ims[grading] = 0
+        else:
+            self._dim_ims[grading] = self.differentials[grading].rank_im()
+        return self._dim_ims[grading]
+
+    def rank_ker(self, grading):
+        if grading in self._dim_kers.keys():
+            return self._dim_kers[grading]
+        if grading not in self.differentials.keys():
+            self._dim_kers[grading] = self.ranks.get(grading, 0)
+        else:
+            self._dim_kers[grading] = self.differentials[grading].rank_ker()
+        return self._dim_kers[grading]
+
+    def rank_homology(self, grading):
+        if self.grading_mod == 0:
+            gr_plus_1 = grading + 1
+        else:
+            gr_plus_1 = grading + 1 % self.grading_mod
+        return self.rank_ker(grading) - self.rank_im(gr_plus_1)
+
+    def set_qrs_decomposition(self):
+        """Compute qrs decomposition of the chain complex. Requires complex to be Z-graded"""
+        if self.grading_mod != 0:
+            raise ValueError(f"Trying to compute qrs decomposition of MatrixChainComplex"
+                             f" with grading_mod={self.grading_mod}")
+        if self.qrs_decomposition is not None:
+            return
         current_grading = self.max_grading
-        q_decomposition = dict()
+        qrs_decomposition = dict()
+        dim_ims = dict()
+        dim_kers = dict()
         previous_ref_q = None
         previous_im_rank = 0
         while current_grading >= self.min_grading:
-            current_matrix = self.differentials[current_grading]
+            # current_matrix = M_n
+            current_matrix = self.differentials.get(current_grading)
+            if current_matrix is None:
+                dim_ims[current_grading] = 0
+                dim_kers[current_grading] = self.ranks.get(current_grading, 0)
+                continue
+
+            # Set current matrix to M_n Q_{n+1}
             if previous_ref_q is not None:
                 current_matrix = current_matrix.multiply(previous_ref_q)
-            # throw out the first columns which correspond to image of the previous del and compute RREF
-            modified_matrix = Matrix(current_matrix.values[:, (current_matrix.n_cols - previous_im_rank):])
-            modified_matrix.set_red_row_echelon()
-            q_decomposition[current_grading] = {
-                "left_modified": modified_matrix
+
+            # compute Q_n, R_n so that Q_n R_n = M_n Q_{n+1}
+            # throw out the first columns of M_n Q_{n+1} which correspond to image of the previous del and compute RREF
+            # We have to add back in the thrown out columns to recover R_n
+            truncated_matrix = Matrix(current_matrix.values[:, (current_matrix.n_cols - previous_im_rank):])
+            truncated_matrix.set_red_row_echelon()
+            dim_ims[current_grading] = truncated_matrix.rank_im()
+            dim_kers[current_grading] = previous_im_rank + truncated_matrix.rank_ker()
+            qrs_decomposition[current_grading] = {
+                "ref_q": truncated_matrix.ref_q,
+                "ref_q_inv": truncated_matrix.ref_q_inv,
+                "ref": Matrix(
+                    np.concatenate((np.zeros((current_matrix.n_rows, previous_im_rank)),truncated_matrix.ref_q)),
+                    coeff_mod=self.coeff_mod)
             }
+
+            # compute the S_n matrix
+            s_matrix_rows = []
+            # kernels for the truncated R_n matrix, upgraded to have the correct dimension
+            for v in truncated_matrix.kernel():
+                s_matrix_rows.append(np.concatenate(np.zeros((previous_im_rank, v)), axis=0))
+            # vectors spanning image of the previous differential
+            for i in range(previous_im_rank):
+                s_matrix_rows.append(utils.one_hot_array(i, current_matrix.n_cols))
+            # vectors for the pivot indices of the truncated R_n matrix
+            r_n_pivots_cols = [ind[1] for ind in truncated_matrix.ref_pivot_indices]
+            for col_num in r_n_pivots_cols:
+                s_matrix_rows.append(utils.one_hot_array(col_num + previous_im_rank, current_matrix.n_cols))
+            s_matrix = Matrix(s_matrix_rows, coeff_mod=self.coeff_mod)
+            qrs_decomposition[current_grading]["s"] = s_matrix
+            qrs_decomposition[current_grading]["s_inv"] = s_matrix.get_inverse()
+
             # set up for next iteration
             if current_grading - 1 in self.differentials.keys():
-                previous_ref_q = modified_matrix.ref_q
+                previous_ref_q = truncated_matrix.ref_q
             current_grading -= 1
-        for i in q_decomposition.keys():
-            left_right_modified = q_decomposition[i]["left_modified"]
-            if i-1 in q_decomposition.keys():
-                left_right_modified = q_decomposition[i-1]["left_modified"].ref_q_inv.multiply(left_right_modified)
-            q_decomposition[i]["left_right_modified"] = left_right_modified
-
-
+        self.qrs_decomposition = qrs_decomposition
 
 
 class SpectralSequence(DGBase):
@@ -775,7 +801,7 @@ class DGA(DGBase):
                     grading_mod=self.grading_mod,
                     coeff_mod=self.coeff_mod,
                 )
-                self.bilin_polys[(i,j)] = cx.get_poincare_poly()
+                self.bilin_polys[(i,j)] = cx.poincare_poly()
                 bilin_counter += 1
                 LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
         self.lin_poly_list = sorted(
