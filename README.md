@@ -32,12 +32,17 @@ Here is a complete list of url arguments:
 - `n_strands`: How many strands of the plat? Must be a positive even integer.
 - `crossings`: Crossings of the plat in the front projection. This will be resolved using Lagrangian resolution.
 - `lazy_disks`: True or False. If True, just print the plat diagram and list the chords.
-- `auto_dgas`: `lch`, `rsft`, or both (`lch,rsft`). Which DGAs should we analyze?
+- `auto_dgas`: `lch`, `rsft`, or both (`lch,rsft`). Which DGAs should we analyze? Here `rsft` is the planar diagram algebra.
 - `mirror`: If True, reverse order of the the front_crossings.
 - `orientation_flips`: Comma separated list of True/False. Will change the orientations of the link components.
 - `aug_fill_na`: 0 or 1 if used. Use only is there are many augmentations. Augmentations will always be computed with some variables set to `None` (meaning that they could take on any value, 0 or 1). If `aug_fill_na` is not None, we use this number to fill in these values.
+- `spec_poly`: If True and `auto_dgas=rsft`, will compute the spectral sequence polynomials associated to bilinearizations as described in [the article](https://arxiv.org/abs/2205.13031).
 
-Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). You can monitor the terminal to see what computations are happening. For small numbers of crossings, computations of bilinearized Poincare polynomials may still take a while.
+If we modify the above URL to `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&auto_dgas=rsft&spec_poly=True`, we'll see the collections of Poincaré polynomials from the above screenshot modified:
+
+![image info](./main/static/spec_poly_screenshot.png)
+
+Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). You can monitor the terminal to see what computations are happening. For small numbers of crossings, computations of bilinearized Poincare polynomials may still take a while. Typically things will take a long time if there are many augmentations, which can be seen in the terminal logs.
 
 To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
 
@@ -179,15 +184,12 @@ I cannot guarantee that this is not a bad idea!
 
 ## Features
 
-- Compute spectral sequence polynomials to improve poincare polynomials.
+- Capping paths is storing too much info. We really only need this for rotation numbers.
 - Normalized euler characteristic and normalized augmentation count.
 - Compute the full augmentation tree?
 - Tools for decompressing augmentations. We want to control the order of augmentations so that we can track them by indices.
 - How do we more efficiently store augmentations? Maybe as `SubsNode`s? Currently it appears that compressed augs can expand enormously.
-- Capping paths is storing too much info. We really only need this for rotation numbers.
-- Get dual betti numbers of chain complexes by transposing matrices. Currently broken.
 - Command line interface would make it easy to run scripts.
-- Way behind on testing...
 - Is there any way to speed up the computations of poincare polynomials? This should boil down to speeding up `rref` computations.
 - Grid -> plat algorithm. From grids could import the knot atlas or do algorithmic exploration. Difficult to enumerate links using plat presentations.
 - Copy knot tables.

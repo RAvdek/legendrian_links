@@ -442,6 +442,9 @@ class TestSpectralSequence(unittest.TestCase):
                 (algebra.PAGE_VAR + 1) * algebra.FILTRATION_VAR
                 * (1 + algebra.FILTRATION_VAR * algebra.DEGREE_VAR ** 2)
         )
+        LOG.info('sphere')
+        LOG.info(p_poly)
+        LOG.info(expected)
         self.assertTrue(utils.poly_equal(p_poly, expected))
 
     def test_heart_sphere(self):
@@ -463,6 +466,9 @@ class TestSpectralSequence(unittest.TestCase):
         t = algebra.DEGREE_VAR
         r = algebra.PAGE_VAR
         expected = p + (t * p**2) + (p**3 + p**4)*t**2 + (r + r**2 + r**3)*(p + (p**4)*(t**2))
+        LOG.info('heart sphere')
+        LOG.info(p_poly)
+        LOG.info(expected)
         self.assertTrue(utils.poly_equal(p_poly, expected))
 
 

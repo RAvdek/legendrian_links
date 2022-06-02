@@ -647,8 +647,9 @@ class MatrixChainComplex(object):
             if previous_ref_q is not None:
                 current_matrix = current_matrix * previous_ref_q
 
-            # compute Q_n, R_n so that Q_n R_n = M_n Q_{n+1}
-            # throw out the first columns of M_n Q_{n+1} which correspond to image of the previous del and compute RREF
+            # Compute Q_n, R_n so that Q_n R_n = M_n Q_{n+1}.
+            # Then throw out the first columns of M_n Q_{n+1} which correspond to
+            # image of the previous del and compute RREF.
             # We have to add back in the thrown out columns to recover R_n
             truncated_matrix = Matrix(
                 current_matrix.values[:, previous_im_rank:],
@@ -666,6 +667,7 @@ class MatrixChainComplex(object):
             else:
                 expanded_ref = truncated_matrix.ref
             # check that the expanded ref has the same dimensions as the original matrix
+            # the rediculous error message will help trouble shoot
             if current_matrix.values.shape != expanded_ref.values.shape:
                 raise RuntimeError(f"current_matrix.values.shape={current_matrix.values.shape} != "
                                    f"expanded_ref.values.shape={expanded_ref.values.shape}.\n"
@@ -750,12 +752,13 @@ class SpectralSequence(DGBase):
         self._set_initial_matrices()
 
         # ranks[(filt, deg)] = # variables with prescribed filtration level and degree
+        # on page r, this will be the rank of E^{p}_{filt, deg}
         ranks = {k: len(v) for k, v in self._filtered_vars.items()}
         ranks = {k: v for k, v in ranks.items() if v != 0}
         rank_homology = dict()
         poincare_poly = 0
         page_num = 0
-        while page_num <= self.max_filtration:
+        while page_num <= self.max_filtration - 1:
             LOG.info(f"Computing page={page_num} of spectral sequence")
             LOG.info(poincare_poly)
             LOG.info(ranks)
@@ -809,7 +812,6 @@ class SpectralSequence(DGBase):
             for data in page_data:
                 page_indices += data['indices']
             page_triple_indices = [(filt, filt - page_num, deg) for filt, deg in page_indices]
-            ranks = {k: v for k, v in ranks.items() if k not in page_indices}
             self._matrices = {k: v for k, v in self._matrices.items() if k not in page_triple_indices}
 
             # compute qrs decomposition of each complex in the page and
@@ -818,6 +820,8 @@ class SpectralSequence(DGBase):
             page_q_inv = dict()
             page_s = dict()
             page_s_inv = dict()
+            LOG.info(f"len(page_data)={len(page_data)} @ page_num={page_num}")
+            new_ranks = dict()
             while len(page_data) > 0:
                 data = page_data.pop()
                 data['cx'].set_qrs_decomposition()
@@ -825,6 +829,7 @@ class SpectralSequence(DGBase):
                     # add contributions to the specseq homology ranks and poincare polynomial
                     betti = data['cx'].rank_homology(deg)
                     rank_homology[(page_num + 1, filt, deg)] = betti
+                    new_ranks[(filt, deg)] = betti
                     poincare_poly += betti * (DEGREE_VAR ** deg) * (FILTRATION_VAR ** filt) * (PAGE_VAR ** page_num)
                     # add the transformation data
                     if deg in data['cx'].qrs_decomposition.keys():
@@ -832,7 +837,9 @@ class SpectralSequence(DGBase):
                         page_q_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q_inv']
                         page_s[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s']
                         page_s_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s_inv']
+            ranks = new_ranks
 
+            # manual override prevents us from applying a bunch of unneeded transformations below
             if page_num == self.max_filtration - 1:
                 break
             # update self.matrices by applying matrix mult and slicing only the relevant indices
