@@ -100,7 +100,9 @@ Now we can proceed with computing bilinearized homologies, etc. If the number of
 
 # Algebraic tools
 
-![](./main/static/heart_sphere.png | width=100)
+The files `algebra.py` and `polynomials.py` contain tools for working with DGAs and chain complexes.
+
+<img src="./main/static/heart_sphere.png" width="50%">
 
 # Testing
 
