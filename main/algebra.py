@@ -593,10 +593,9 @@ class MatrixChainComplex(object):
 
     def rank_homology(self, grading):
         """:return: int rank of homology at specified grading degree"""
-        if self.grading_mod == 0:
-            gr_plus_1 = grading + 1
-        else:
-            gr_plus_1 = grading + 1 % self.grading_mod
+        gr_plus_1 = grading + 1
+        if self.grading_mod != 0:
+            gr_plus_1 %= self.grading_mod
         return self.rank_ker(grading) - self.rank_im(gr_plus_1)
 
     @utils.log_start_stop
@@ -679,12 +678,19 @@ class MatrixChainComplex(object):
                 raise ValueError(f"Differential {d} is not a matrix")
             if not d.coeff_mod == self.coeff_mod:
                 raise ValueError(f"Coeff_mods disagree {d.coeff_mod} != {self.coeff_mod}.")
+        # Throw out matrices which have no rows
+        self.differentials = {k: v for k, v in self.differentials.items() if v.n_rows != 0}
+        for k, d in self.differentials.items():
             if d.n_cols != self.ranks[k]:
                 raise ValueError(f"Differential at degree {k} "
                                  f"has n_cols={d.n_cols} != self.ranks[k] = {self.ranks[k]}")
-            if d.n_rows != self.ranks.get(k-1, 0):
+            k_min_1 = k - 1
+            if self.coeff_mod != 0:
+                k_min_1 %= self.coeff_mod
+            k_min_1_rank = self.ranks.get(k_min_1, 0)
+            if d.n_rows != k_min_1_rank:
                 raise ValueError(f"Differential at degree k={k} "
-                                 f"has n_rows={d.n_rows} != self.ranks[k-1] = {self.ranks.get(k-1, 0)}")
+                                 f"has n_rows={d.n_rows} != self.ranks[{k_min_1}] = {k_min_1_rank}")
 
 
 class SpectralSequence(DGBase):

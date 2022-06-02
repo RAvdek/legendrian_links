@@ -428,6 +428,7 @@ class TestSpectralSequence(unittest.TestCase):
 
     def test_sphere(self):
         # Morse function with a pair of critical points on S2 for north and south poles
+        # This converges at the zeroth page
         n, s = sympy.symbols('n, s')
         gradings = {n: 2, s: 0}
         differentials = {
@@ -444,7 +445,8 @@ class TestSpectralSequence(unittest.TestCase):
         self.assertTrue(utils.poly_equal(p_poly, expected))
 
     def test_heart_sphere(self):
-        # Try the heart shaped sphere, wth one of the humps higher than the other
+        # Try the heart shaped sphere, wth one of the humps higher than the other,
+        # each critical point in its own filtration level
         w, x, y, z = sympy.symbols('w,x,y,z')
         gradings = {w: 2, x: 2, y: 1, z: 0}
         differentials = {
@@ -456,9 +458,13 @@ class TestSpectralSequence(unittest.TestCase):
         specseq = algebra.SpectralSequence(
             gradings=gradings, differentials=differentials, filtration_levels=filtration_levels, coeff_mod=2)
         p_poly = specseq.poincare_poly()
-        LOG.info(f"Heart sphere poly = {p_poly}")
-        # TODO: Compute this for real
-        self.assertNotEqual(p_poly, 0)
+        # Checked by hand
+        p = algebra.FILTRATION_VAR
+        t = algebra.DEGREE_VAR
+        r = algebra.PAGE_VAR
+        expected = p + (t * p**2) + (p**3 + p**4)*t**2 + (r + r**2 + r**3)*(p + (p**4)*(t**2))
+        self.assertTrue(utils.poly_equal(p_poly, expected))
+
 
 class TestDGA(unittest.TestCase):
 

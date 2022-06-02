@@ -154,6 +154,7 @@ def one_hot_array(i, shape):
 
 
 # sympy has difficulty with equality
+# https://docs.sympy.org/latest/explanation/gotchas.html#double-equals-signs
 
 def poly_equal(p1, p2):
     return sympy.expand(p1 - p2) == 0
