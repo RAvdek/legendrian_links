@@ -100,7 +100,7 @@ Now we can proceed with computing bilinearized homologies, etc. If the number of
 
 # Algebraic tools
 
-![the heart sphere](./main/static/heart_sphere.svg)
+![the heart sphere](./main/static/heart_sphere.png)
 
 # Testing
 
