@@ -486,12 +486,13 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False, lazy_lch=True, lazy_rsft=True, aug_fill_na=None):
+    def __init__(self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False, lazy_lch=True, lazy_rsft=True, aug_fill_na=None, spec_poly=False):
         self.n_strands = n_strands
         if mirror:
             self.front_crossings = list(reversed(front_crossings))
         else:
             self.front_crossings = front_crossings
+        self.spec_poly = spec_poly
         self.n_copy = n_copy
         self.orientation_flips = orientation_flips
         self.lazy_disks = lazy_disks
@@ -1188,5 +1189,6 @@ class PlatDiagram(object):
             grading_mod=self.rsft_grading_mod,
             lazy_augs=lazy_augs,
             lazy_bilin=lazy_bilin,
-            aug_fill_na=self.aug_fill_na
+            aug_fill_na=self.aug_fill_na,
+            spec_poly=self.spec_poly
         )

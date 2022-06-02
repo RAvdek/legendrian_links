@@ -6,12 +6,13 @@ import utils
 import polynomials
 
 LOG = utils.LOG
-POINCARE_POLY_VAR = sympy.Symbol('t')
+PAGE_VAR = sympy.Symbol('r', commutative=True)
+FILTRATION_VAR = sympy.Symbol('p', commutative=True)
+DEGREE_VAR = sympy.Symbol('t', commutative=True)
 
 
 class Differential(object):
-    """Differential of a DGA element.
-    """
+    """Differential of a sympy symbol."""
 
     def __init__(self, expression, coeff_mod=2):
         self.expression = expression
@@ -21,6 +22,7 @@ class Differential(object):
         return str(self.expression)
 
     def is_linear(self):
+        """Returns True or False is the expression is linear"""
         return polynomials.is_linear(self.expression)
 
     def linearize(self, subs):
@@ -53,52 +55,65 @@ class Differential(object):
 class Matrix(object):
     """Attributes:
 
-    lazy_ref: If False, compute row echelon form upon initialization
     values: np.array
-    n_rows:
-    n_cols:
+    n_rows: Int
+    n_cols: Int
     coeff_mod: Consider as matrix with coeffs modulus this number
     ref: Row echelon form
     ref_q: Matrix such that ref_q * ref = self
     ref_q_inv: Inverse of ref_q
-    rank_im: Dimension of the image
-    rank_ker: Dimension of the kernel
+    ref_form: Is the matrix REF (row echelon form) or RREF (reduced row echeleon form)?
     """
+    REF = 'REF'
+    RREF = 'RREF'
 
-    def __init__(self, values, coeff_mod=0, lazy_ref=False):
-        self.lazy_ref = lazy_ref
+    def __init__(self, values, coeff_mod=0):
         self.values = np.array(values)
-
-        wrong_shape = len(self.values.shape) != 2
-        if wrong_shape:
-            self._init_wrong_shape()
-            return
 
         self.n_rows = self.values.shape[0]
         self.n_cols = self.values.shape[1]
         self.coeff_mod = coeff_mod
+        self._wierd_shape = False
+
+        wrong_shape = len(self.values.shape) != 2
+        wrong_shape |= self.values.shape[0] == 0
+        if wrong_shape:
+            self._init_wrong_shape()
+            return
+
         if coeff_mod != 0:
             self.values %= self.coeff_mod
+        self.ref_form = None
         self.ref = None
         self.ref_q = None
         self.ref_q_inv = None
-        self.rank_im = None
-        self.rank_ker = None
-        if not lazy_ref:
-            self.set_row_echelon()
+        self.ref_free_indices = None
+        self.ref_pivot_indices = None
+        self._kernel = None
+        self._rank_im = None
+        self._rank_ker = None
+        self._det = None
 
     def __repr__(self):
         return str(self.values)
 
+    def __mul__(self, other):
+        """Allows us to use X * Y with X a matrix and Y a matrix or array"""
+        if isinstance(other, Matrix):
+            return self.multiply(other)
+        return self.multiply_array(other)
+
     def _init_wrong_shape(self):
+        self._wierd_shape = True
         if self.values.shape[0] == 0:
-            self.n_rows = 0
-            self.n_cols = 0
             self.ref = self
             self.ref_q = self
             self.ref_q_inv = self
-            self.rank_im = 0
-            self.rank_ker = 0
+            self._rank_im = 0
+            self._rank_ker = self.n_cols
+            self._det = 0
+            self.ref_pivot_indices = list()
+            self.ref_free_indices = list(range(self.n_cols))
             return
         else:
             raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
@@ -114,55 +129,160 @@ class Matrix(object):
         if not self.coeff_mod == other.coeff_mod:
             raise ValueError(f"Trying to multiply matrix having coeff_modulus={self.coeff_mod} "
                              f"with other having coeff_modulus={other.coeff_mod}")
-        values = np.matmul(self.values, other.values)
-        return Matrix(values=values, coeff_mod=self.coeff_mod, lazy_ref=self.lazy_ref)
+        values = np.dot(self.values, other.values)
+        return Matrix(values=values, coeff_mod=self.coeff_mod)
+
+    def multiply_array(self, array):
+        """Multiple self with a 1-d array.
+
+        :param array: 1-d array (list or numpy array)
+        :return: 1-d numpy array
+        """
+        return np.dot(self.values, array)
+
+    def rank_im(self):
+        if self.n_rows == 0 or self.n_cols == 0:
+            return 0
+        if self._rank_im is None:
+            self.set_row_echelon()
+        return self._rank_im
+
+    def rank_ker(self):
+        if self.n_cols == 0:
+            return 0
+        if self.n_rows == 0:
+            return self.n_cols
+        if self._rank_ker is None:
+            self.set_row_echelon()
+        return self._rank_ker
 
     def set_row_echelon(self):
-        """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self.
+        """Set ref, ref_q, ref_q_inv, rank_im, rank_ker attributes for self. Sets self.ref_form = self.REF
 
         :return: None
         """
+        if self._wierd_shape:
+            return
         ref = self.values.copy()
-        q = np.identity(self.n_rows)
-        q_inv = np.identity(self.n_rows)
-        k = 0
-        l = 0
-        while k < self.n_rows:
-            while l < self.n_cols and not (np.any(ref[k:, l])):
-                l += 1
-            if l == self.n_cols:
+        ref_q = np.identity(self.n_rows)
+        ref_q_inv = np.identity(self.n_rows)
+        row_num = 0
+        col_num = 0
+        while row_num < self.n_rows:
+            while col_num < self.n_cols and not (np.any(ref[row_num:, col_num])):
+                col_num += 1
+            if col_num == self.n_cols:
                 break
-            ref, q, q_inv = self._row_reduce(ref, q, q_inv, k, l)
-            k += 1
-        self.ref = Matrix(ref, coeff_mod=self.coeff_mod, lazy_ref=True)
-        self.ref_q = Matrix(q, coeff_mod=self.coeff_mod, lazy_ref=True)
-        self.ref_q_inv = Matrix(q_inv, coeff_mod=self.coeff_mod, lazy_ref=True)
-        self.rank_im = k
-        self.rank_ker = self.n_cols - k
+            ref, ref_q, ref_q_inv = self._row_reduce(ref, ref_q, ref_q_inv, row_num, col_num)
+            row_num += 1
+        self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
+        self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
+        self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
+        self._rank_im = row_num
+        self._rank_ker = self.n_cols - row_num
+        # need to set pivots and free indices
+        pivot_indices = list()
+        free_indices = list()
+        loc_row = 0
+        loc_col = 0
+        while loc_col < self.n_cols:
+            pivot = False
+            if self.ref.values[loc_row, loc_col] == 0:
+                free_indices.append(loc_col)
+            elif loc_row not in [x[0] for x in pivot_indices]:
+                pivot_indices.append([loc_row, loc_col])
+                pivot = True
+            loc_col += 1
+            if pivot and loc_row < self.n_rows - 1:
+                loc_row += 1
+        self.ref_pivot_indices = pivot_indices
+        self.ref_free_indices = free_indices
+        self.ref_form = self.REF
+        if self.n_rows == self.n_cols:
+            det = utils.prod([self.ref.values[k, k] for k in range(self.n_cols)])
+            if self.coeff_mod != 0:
+                det %= self.coeff_mod
+            self._det = det
+
+    def set_red_row_echelon(self):
+        """Override the ref variables with variables associated to reduced row echelon form,
+        Sets self.ref_form = self.RREF
+
+        :return: None
+        """
+        if self._wierd_shape:
+            return
+        if self.ref is None:
+            self.set_row_echelon()
+        ref, ref_q, ref_q_inv = self.ref.values, self.ref_q.values, self.ref_q_inv.values
+        for row_num, col_num in self.ref_pivot_indices:
+            if self.coeff_mod != 2:
+                ref, ref_q, ref_q_inv = self._rref_normalize(ref, ref_q, ref_q_inv, row_num, col_num)
+            ref, ref_q, ref_q_inv = self._rref_column_clean(ref, ref_q, ref_q_inv, row_num, col_num)
+        self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
+        self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
+        self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
+        self.ref_form = self.RREF
+
+    def kernel(self):
+        """Sets and returns the kernel as a list of column vectors"""
+        if self._kernel is not None:
+            return self._kernel
+        if self.ref_form != self.RREF:
+            self.set_red_row_echelon()
+        # we can compute the span of the kernel using the free variable columns
+        pivot_columns = [p[1] for p in self.ref_pivot_indices]
+        kernel = list()
+        for i in self.ref_free_indices:
+            v = np.zeros(self.n_cols)
+            v[i] = 1
+            for j in pivot_columns:
+                if j < i:
+                    v[j] = -self.values[j, i]
+            kernel.append(v)
+        self._kernel = kernel
+        return self._kernel
 
     def is_square(self):
+        """Return True or False for if the matrix is square"""
         return self.n_rows == self.n_cols
 
-    def _row_reduce(self, ref, q, q_inv, k, l):
-        while np.any(ref[k + 1:, l]):
-            ref, q, q_inv = self._row_prepare(ref, q, q_inv, k, l)
-            ref, q, q_inv = self._partial_row_reduce(ref, q, q_inv, k, l)
-        if self.coeff_mod != 0:
-            ref %= self.coeff_mod
-            q %= self.coeff_mod
-            q_inv %= self.coeff_mod
-        return ref, q, q_inv
+    def det(self):
+        """Return determinant of matrix as element of Z/coeff_mod"""
+        if self.n_rows != self.n_cols:
+            return ValueError("Trying to compute det of non-square matrix")
+        if self._det is None:
+            self.set_row_echelon()
+        return self._det
 
-    def _row_prepare(self, ref, q, q_inv, k, l):
-        (a, i) = self._smallest_nonzero_index(ref[:, l], k)
-        ref[[i, k], :] = ref[[k, i], :]
-        q_inv[[i, k], :] = q_inv[[k, i], :]  # row swap
-        q[:, [i, k]] = q[:, [k, i]]  # column swap
+    def get_inverse(self):
+        """Return inverse if it exists, otherwise raise ValueError"""
+        if self.n_rows != self.n_cols:
+            return ValueError("Trying to invert non-square matrix")
+        if self.det() == 0:
+            raise ValueError(f"Trying to invert non-invertible matrix,\n{self}")
+        return self.ref_q_inv
+
+    def _row_reduce(self, ref, ref_q, ref_q_inv, k, l):
+        while np.any(ref[k + 1:, l]):
+            ref, ref_q, ref_q_inv = self._ref_swap(ref, ref_q, ref_q_inv, k, l)
+            ref, ref_q, ref_q_inv = self._ref_addition(ref, ref_q, ref_q_inv, k, l)
         if self.coeff_mod != 0:
             ref %= self.coeff_mod
-            q %= self.coeff_mod
-            q_inv %= self.coeff_mod
-        return ref, q, q_inv
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
+
+    def _ref_swap(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        (a, i) = self._smallest_nonzero_index(ref[:, col_num], row_num)
+        ref[[i, row_num], :] = ref[[row_num, i], :]
+        ref_q_inv[[i, row_num], :] = ref_q_inv[[row_num, i], :]  # row swap
+        ref_q[:, [i, row_num]] = ref_q[:, [row_num, i]]  # column swap
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
 
     @staticmethod
     def _smallest_nonzero_index(v, k):
@@ -174,24 +294,55 @@ class Matrix(object):
         except:
             return 0, np.nan  # minNonZero causes this sometimes
 
-    def _partial_row_reduce(self, ref, q, q_inv, k, l):
-        for i in range(k + 1, q.shape[0]):
-            c = (ref[i, l] // ref[k, l])
+    def _ref_addition(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        for i in range(row_num + 1, ref_q.shape[0]):
+            coeff = (ref[i, col_num] // ref[row_num, col_num])
             if self.coeff_mod != 0:
-                c %= self.coeff_mod
+                coeff %= self.coeff_mod
             # row add i,k,-q
-            ref[i] += (-c * ref[k])
-            q_inv[i] += (-c * q_inv[k])  # row add
-            q[:, k] += (c * q[:, i])  # column add (note i,k are switched)
+            ref[i] += (-coeff * ref[row_num])
+            ref_q_inv[i] += (-coeff * ref_q_inv[row_num])  # row add
+            ref_q[:, row_num] += (coeff * ref_q[:, i])  # column add (note i,k are switched)
             if self.coeff_mod != 0:
                 ref[i] %= self.coeff_mod
-                q_inv[i] %= self.coeff_mod
-                q[:, k] %= self.coeff_mod
+                ref_q_inv[i] %= self.coeff_mod
+                ref_q[:, row_num] %= self.coeff_mod
         if self.coeff_mod != 0:
             ref %= self.coeff_mod
-            q %= self.coeff_mod
-            q_inv %= self.coeff_mod
-        return ref, q, q_inv
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
+
+    def _rref_normalize(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        coeff = ref[row_num, col_num]
+        coeff_inv = utils.num_inverse(coeff, self.coeff_mod)
+        # divide ref and ref_q_inv row by coefficient at the pivot
+        ref[row_num, :] = coeff_inv * ref[row_num, :]
+        ref_q_inv[row_num, :] = coeff_inv * ref_q_inv[row_num, :]
+        # multiple ref_q column by coefficient at the pivot
+        ref_q[:, row_num] = coeff * ref_q[:, row_num]
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
+
+    def _rref_column_clean(self, ref, ref_q, ref_q_inv, row_num, col_num):
+        # add rows to eliminate entries above the specified pivot entry
+        if not ref[row_num, col_num] == 1:
+            raise ValueError(f"ref[row_num, col_num] = {ref[row_num, col_num]} != 1")
+        if row_num == 0:
+            return ref, ref_q, ref_q_inv
+        for i in range(0, row_num):
+            coeff = ref[i, col_num]
+            ref[i, :] -= coeff * ref[row_num, :]
+            ref_q_inv[i, :] -= coeff * ref_q_inv[row_num, :]
+            ref_q[:, row_num] += coeff * ref_q[:, i]
+        if self.coeff_mod != 0:
+            ref %= self.coeff_mod
+            ref_q %= self.coeff_mod
+            ref_q_inv %= self.coeff_mod
+        return ref, ref_q, ref_q_inv
 
 
 class LinearMap(object):
@@ -200,39 +351,66 @@ class LinearMap(object):
     def __init__(self, coeff_dict, range_symbols, coeff_mod=2):
         """
         :param coeff_dict: Dict of the form {symbol: sympy expression}
+        :param range_symbols: Symbols of the target.
         :param coeff_mod: Coefficient modulus to use
         """
         self.coeff_dict = coeff_dict
         self.range_symbols = range_symbols
         self.coeff_mod = coeff_mod
         self._set_dims()
-        self._set_input_vars()
+        self._set_domain_symbols()
         self._set_matrix()
+        self._kernel = None
 
     def __repr__(self):
         return str(self.coeff_dict)
 
+    def rank_ker(self):
+        return self.matrix.rank_ker()
+
+    def rank_im(self):
+        return self.matrix.rank_im()
+
+    def array_to_domain_expression(self, array):
+        array_len = len(array)
+        n_symbols = len(self.domain_symbols)
+        if not array_len == n_symbols:
+            raise ValueError(f"Trying to get expression for len(array)={array_len} from {n_symbols} symbols")
+        v_out = 0
+        for i in range(self.dim_domain):
+            v_out += array[i] * self.domain_symbols[i]
+        return v_out
+
+    def kernel(self):
+        if self._kernel is None:
+            mat_ker = self.matrix.kernel()
+            output = list()
+            for v in mat_ker:
+                output.append(self.array_to_domain_expression(v))
+            self._kernel = output
+        return self._kernel
+
     def _set_dims(self):
-        self.dim_dom = len(self.coeff_dict.keys())
+        self.dim_domain = len(self.coeff_dict.keys())
         self.dim_range = len(self.range_symbols)
 
-    def _set_input_vars(self):
+    def _set_domain_symbols(self):
         """Encode input and output symbols as `onehot` vectors so that they could be turned into a matrix"""
-        self.input_vars = list(self.coeff_dict.keys())
+        self.domain_symbols = sorted(list(self.coeff_dict.keys()), key=str)
 
     def _set_matrix(self):
         # The dtype should be essential to avoid float arithmetic errors
-        values = np.zeros((len(self.range_symbols), len(self.input_vars)), dtype=np.integer)
-        for i in range(len(self.input_vars)):
+        values = np.zeros((len(self.range_symbols), len(self.domain_symbols)), dtype=np.integer)
+        for i in range(len(self.domain_symbols)):
             for j in range(len(self.range_symbols)):
                 temp_subs = {s: 0 if s != self.range_symbols[j] else 1 for s in self.range_symbols}
-                value = sympy.sympify(self.coeff_dict[self.input_vars[i]]).subs(temp_subs)
+                value = sympy.sympify(self.coeff_dict[self.domain_symbols[i]]).subs(temp_subs)
                 values[j][i] = value
         self.matrix = Matrix(values=values, coeff_mod=self.coeff_mod)
 
 
 class DGBase(object):
-    """Base class for differential graded objects"""
+    """Base class for differential graded objects which are instantiated using sympy expressions for differentials"""
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         """
@@ -250,8 +428,18 @@ class DGBase(object):
         self._verify_init_args()
         self._correct_gradings()
         self._correct_filtration_levels()
+        self._set_min_max_gradings()
+
+    def get_generators_by_grading(self, grading):
+        return [k for k, v in self.gradings.items() if v == grading]
+
+    def get_generators_by_filtration(self, filtration):
+        if self.filtration_levels is None:
+            raise ValueError("Trying to access filtration levels where there are none")
+        return [k for k, v in self.filtration_levels.items() if v == filtration]
 
     def reduced(self, ceoff_mod, grading_mod):
+        """Return instance of self with coefficients and gradings reduced by new moduli"""
         if self.coeff_mod % ceoff_mod != 0:
             raise ValueError(f"New coefficient modulus {ceoff_mod} doesn't divide old modulus {self.coeff_mod}")
         if self.grading_mod % grading_mod != 0:
@@ -263,12 +451,17 @@ class DGBase(object):
             grading_mod=grading_mod
         )
 
+    def _set_min_max_gradings(self):
+        grading_values = set(self.gradings.values())
+        self.max_grading = max(grading_values)
+        self.min_grading = min(grading_values)
+
     def _correct_filtration_levels(self):
         if self.filtration_levels is None:
             self.filtration_levels = {k: 1 for k in self.gradings.keys()}
-            self.max_filtration_level = 1
+            self.max_filtration = 1
             return
-        self.max_filtration_level = max(self.filtration_levels.values())
+        self.max_filtration = max(self.filtration_levels.values())
 
     def _verify_init_args(self):
         if self.coeff_mod != 0:
@@ -287,6 +480,10 @@ class DGBase(object):
 
 
 class ChainComplex(DGBase):
+    """Additive chain complex instantiated from sympy expressions for differentials.
+
+    Use this class to access chain complex homotopy invariants.
+    """
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0):
         super(ChainComplex, self).__init__(
@@ -297,75 +494,424 @@ class ChainComplex(DGBase):
             grading_mod=grading_mod
         )
         self._verify_linear_differentials()
-        self._set_linear_maps()
-        self._set_poincare_poly()
+        self._set_matrix_cx()
+        self._poincare_poly = None
+
+    def rank_homology(self, grading):
+        """:return: int rank of homology at specified grading degree"""
+        return self.matrix_cx.rank_homology(grading)
+
+    def poincare_poly(self):
+        """:return: sympy expression for poincare polynomial"""
+        if self._poincare_poly is None:
+            self._poincare_poly = self.matrix_cx.poincare_poly()
+        return self._poincare_poly
 
     def _verify_linear_differentials(self):
         for k, v in self.differentials.items():
             if not v.is_linear():
                 raise ValueError(f"Trying to instantiate ChainComplex with non-linear differential {k}: {v}")
 
-    def _set_linear_maps(self):
-        # We have to use a dictionary because the degrees may be non-positive
-        self.linear_maps = dict()
-        for i in self.gradings.values():
+    def _set_matrix_cx(self):
+        differentials = dict()
+        ranks = dict()
+        if self.grading_mod != 0:
+            gradings = polynomials.finite_field_elements(self.grading_mod)
+        else:
+            gradings = range(self.min_grading, self.max_grading + 1)
+        for i in gradings:
             i_min_1 = i - 1
             if self.grading_mod != 0:
                 i_min_1 %= self.grading_mod
             range_symbols = [s for s in self.symbols if self.gradings[s] == i_min_1]
             domain_symbols = [s for s in self.symbols if self.gradings[s] == i]
-            diffs = {s: self.differentials[s].expression for s in domain_symbols}
-            self.linear_maps[i] = LinearMap(
-                coeff_dict=diffs,
+            ranks[i] = len(domain_symbols)
+            differentials[i] = LinearMap(
+                coeff_dict={s: self.differentials[s].expression for s in domain_symbols},
                 range_symbols=range_symbols,
+                coeff_mod=self.coeff_mod,
+            ).matrix
+        self.matrix_cx = MatrixChainComplex(
+            ranks=ranks,
+            differentials=differentials,
+            coeff_mod=self.coeff_mod,
+            grading_mod=self.grading_mod
+        )
+
+
+class MatrixChainComplex(object):
+    """Chain complex determined by a pair of dictionaries
+
+    ranks[deg] -> number of generators of degree deg space
+    differentials[deg] -> if ranks[deg] & ranks[deg - 1] are both non-zero, then gives differential as a Matrix
+    """
+
+    def __init__(self, ranks, differentials, coeff_mod=2, grading_mod=0):
+        self.ranks = ranks
+        self._set_chi()
+        self.grading_mod = grading_mod
+        self.coeff_mod = coeff_mod
+        if self.coeff_mod != 0:
+            if not sympy.isprime(self.coeff_mod):
+                raise ValueError(f"Coefficient modulus {self.coeff_mod} is not 0 or prime")
+        self.differentials = differentials
+        self._validate_differentials()
+        self.max_grading = max(ranks.keys())
+        self.min_grading = min(ranks.keys())
+        self._poincare_poly = None
+        self._dim_kers = dict()
+        self._dim_ims = dict()
+        self.qrs_decomposition = None
+
+    def poincare_poly(self):
+        """:return: sympy expression for poincare polynomial"""
+        if self._poincare_poly is not None:
+            return self._poincare_poly
+        output = 0
+        if self.grading_mod != 0:
+            gradings = polynomials.finite_field_elements(self.grading_mod)
+        else:
+            gradings = range(self.min_grading, self.max_grading + 1)
+        poincare_chi = 0
+        for grading in gradings:
+            poincare_chi += self.rank_homology(grading) * ((-1)**grading)
+            output += self.rank_homology(grading) * (DEGREE_VAR ** grading)
+        if poincare_chi != self.chi:
+            raise RuntimeError(f"chi={self.chi} computed from ranks "
+                               f"not matching chi={poincare_chi} computed "
+                               f"from poincare polynomial {output}\n"
+                               f"self.grading_mod={self.grading_mod}\n"
+                               f"ranks={self.ranks}\n"
+                               f"_dim_kers={self._dim_kers}\n"
+                               f"_dim_ims={self._dim_ims}\n"
+                               f"differentials={self.differentials}")
+        self._poincare_poly = output
+        return self._poincare_poly
+
+    def rank_im(self, grading):
+        """:return: int rank of image of differential at specified grading degree"""
+        if self.grading_mod != 0:
+            grading %= self.grading_mod
+        if grading in self._dim_ims.keys():
+            return self._dim_ims[grading]
+        if grading not in self.differentials.keys():
+            self._dim_ims[grading] = 0
+        else:
+            self._dim_ims[grading] = self.differentials[grading].rank_im()
+        return self._dim_ims[grading]
+
+    def rank_ker(self, grading):
+        """:return: int rank of kernel of differential at specified grading degree"""
+        if self.grading_mod != 0:
+            grading %= self.grading_mod
+        if grading in self._dim_kers.keys():
+            return self._dim_kers[grading]
+        if grading not in self.differentials.keys():
+            self._dim_kers[grading] = self.ranks.get(grading, 0)
+        else:
+            self._dim_kers[grading] = self.differentials[grading].rank_ker()
+        return self._dim_kers[grading]
+
+    def rank_homology(self, grading):
+        """:return: int rank of homology at specified grading degree"""
+        gr_plus_1 = grading + 1
+        if self.grading_mod != 0:
+            grading = grading % self.grading_mod
+            gr_plus_1 %= self.grading_mod
+        return self.rank_ker(grading) - self.rank_im(gr_plus_1)
+
+    @utils.log_start_stop
+    def set_qrs_decomposition(self):
+        """Compute qrs decomposition of the chain complex. Requires complex to be Z-graded"""
+        if self.grading_mod != 0:
+            raise ValueError(f"Trying to compute qrs decomposition of MatrixChainComplex"
+                             f" with grading_mod={self.grading_mod}")
+        if self.qrs_decomposition is not None:
+            return
+        current_grading = self.max_grading
+        qrs_decomposition = dict()
+        dim_ims = dict()
+        dim_kers = dict()
+        previous_ref_q = None
+        previous_im_rank = 0
+        while current_grading >= self.min_grading:
+            # current_matrix = M_n
+            current_matrix = self.differentials.get(current_grading)
+            if current_matrix is None or 0 in current_matrix.values.shape or current_matrix.n_cols == previous_im_rank:
+                dim_ims[current_grading] = 0
+                dim_kers[current_grading] = self.ranks.get(current_grading, 0)
+                current_grading -= 1
+                continue
+
+            # Set current matrix to M_n Q_{n+1}
+            if previous_ref_q is not None:
+                current_matrix = current_matrix * previous_ref_q
+
+            # Compute Q_n, R_n so that Q_n R_n = M_n Q_{n+1}.
+            # Then throw out the first columns of M_n Q_{n+1} which correspond to
+            # image of the previous del and compute RREF.
+            # We have to add back in the thrown out columns to recover R_n
+            truncated_matrix = Matrix(
+                current_matrix.values[:, previous_im_rank:],
                 coeff_mod=self.coeff_mod
             )
+            truncated_matrix.set_red_row_echelon()
+            dim_ims[current_grading] = truncated_matrix.rank_im()
+            dim_kers[current_grading] = previous_im_rank + truncated_matrix.rank_ker()
+            if previous_im_rank > 0:
+                expanded_ref = Matrix(
+                    np.concatenate(
+                        (np.zeros((current_matrix.n_rows, previous_im_rank)), truncated_matrix.ref_q), axis=1),
+                    coeff_mod=self.coeff_mod
+                )
+            else:
+                expanded_ref = truncated_matrix.ref
+            # check that the expanded ref has the same dimensions as the original matrix
+            # the rediculous error message will help trouble shoot
+            if current_matrix.values.shape != expanded_ref.values.shape:
+                raise RuntimeError(f"current_matrix.values.shape={current_matrix.values.shape} != "
+                                   f"expanded_ref.values.shape={expanded_ref.values.shape}.\n"
+                                   f"previous_im_rank={previous_im_rank},\n"
+                                   f"truncated_matrix.values.shape={truncated_matrix.values.shape}")
+            # Update gradings
+            qrs_decomposition[current_grading] = {
+                "ref_q": truncated_matrix.ref_q,
+                "ref_q_inv": truncated_matrix.ref_q_inv,
+                "ref": expanded_ref
+            }
 
-    def _set_poincare_poly(self):
-        output_dict = dict()
-        output_dual_dict = dict()
-        for i in self.linear_maps.keys():
-            i_min_1 = i - 1
-            if self.grading_mod != 0:
-                i_min_1 %= self.grading_mod
-            linear_map = self.linear_maps[i]
-            rank_im = linear_map.matrix.rank_im
-            rank_im_dual = rank_im
-            rank_ker = linear_map.matrix.rank_ker
-            rank_ker_dual = linear_map.dim_range - rank_im_dual
-            # Sum up bettis
-            if i in output_dict.keys():
-                output_dict[i] += rank_ker
-            else:
-                output_dict[i] = rank_ker
-            if i_min_1 in output_dict.keys():
-                output_dict[i_min_1] -= rank_im
-            else:
-                output_dict[i_min_1] = -rank_im
-            # Sum up dual bettis
-            if i_min_1 in output_dual_dict.keys():
-                output_dual_dict[i_min_1] += rank_ker_dual
-            else:
-                output_dual_dict[i_min_1] = rank_ker_dual
-            if i in output_dual_dict.keys():
-                output_dual_dict[i] -= rank_im_dual
-            else:
-                output_dual_dict[i] = -rank_im_dual
-        # poincare poly
-        output = 0
-        for i in output_dict.keys():
-            output += output_dict[i] * (POINCARE_POLY_VAR ** i)
-        # dual poly
-        output_dual = 0
-        for i in output_dual_dict.keys():
-            output_dual += output_dual_dict[i] * (POINCARE_POLY_VAR ** i)
-        self.poincare_poly = output
-        self.poincare_poly_dual = output_dual
+            # compute the S_n matrix
+            s_matrix_rows = []
+            # kernels for the truncated R_n matrix, upgraded to have the correct dimension
+            for v in truncated_matrix.kernel():
+                s_matrix_rows.append(np.concatenate((np.zeros(previous_im_rank), v), axis=0))
+            # vectors spanning image of the previous differential
+            for i in range(previous_im_rank):
+                s_matrix_rows.append(utils.one_hot_array(i, current_matrix.n_cols))
+            # vectors for the pivot indices of the truncated R_n matrix
+            r_n_pivots_cols = [ind[1] for ind in truncated_matrix.ref_pivot_indices]
+            for col_num in r_n_pivots_cols:
+                s_matrix_rows.append(utils.one_hot_array(col_num + previous_im_rank, current_matrix.n_cols))
+            s_matrix = Matrix(s_matrix_rows, coeff_mod=self.coeff_mod)
+            qrs_decomposition[current_grading]["s"] = s_matrix
+            qrs_decomposition[current_grading]["s_inv"] = s_matrix.get_inverse()
+
+            # set up for next iteration
+            if current_grading - 1 in self.differentials.keys():
+                previous_ref_q = truncated_matrix.ref_q
+            current_grading -= 1
+        self.qrs_decomposition = qrs_decomposition
+
+    def _set_chi(self):
+        self.chi = sum([v*((-1)**k) for k, v in self.ranks.items()])
+
+    def _validate_differentials(self):
+        for k, d in self.differentials.items():
+            if not isinstance(d, Matrix):
+                raise ValueError(f"Differential {d} is not a matrix")
+            if not d.coeff_mod == self.coeff_mod:
+                raise ValueError(f"Coeff_mods disagree {d.coeff_mod} != {self.coeff_mod}.")
+        # Throw out matrices which have no rows
+        self.differentials = {k: v for k, v in self.differentials.items() if v.n_rows != 0}
+        for k, d in self.differentials.items():
+            if d.n_cols != self.ranks[k]:
+                raise ValueError(f"Differential at degree {k} "
+                                 f"has n_cols={d.n_cols} != self.ranks[k] = {self.ranks[k]}")
+            k_min_1 = k - 1
+            if self.coeff_mod != 0:
+                k_min_1 %= self.coeff_mod
+            k_min_1_rank = self.ranks.get(k_min_1, 0)
+            if d.n_rows != k_min_1_rank:
+                raise ValueError(f"Differential at degree k={k} "
+                                 f"has n_rows={d.n_rows} != self.ranks[{k_min_1}] = {k_min_1_rank}")
+
+
+class SpectralSequence(DGBase):
+    """Spectral sequence associated to a filtered chain complex. Only available for Z-gradings (grading_mod=0)"""
+
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=2, grading_mod=0):
+        super(SpectralSequence, self).__init__(
+            gradings=gradings,
+            differentials=differentials,
+            filtration_levels=filtration_levels,
+            coeff_mod=coeff_mod,
+            grading_mod=grading_mod
+        )
+        self._verify_z_grading()
+        self._rank_homology = None
+        self._poincare_poly = None
+        self._matrices = None
+
+    @utils.log_start_stop
+    def poincare_poly(self):
+        if self._poincare_poly is not None:
+            return self._poincare_poly
+
+        self._set_filtered_vars()
+        self._set_filtered_differentials()
+        self._set_initial_matrices()
+
+        # ranks[(filt, deg)] = # variables with prescribed filtration level and degree
+        # on page r, this will be the rank of E^{p}_{filt, deg}
+        ranks = {k: len(v) for k, v in self._filtered_vars.items()}
+        ranks = {k: v for k, v in ranks.items() if v != 0}
+        rank_homology = dict()
+        poincare_poly = 0
+        page_num = 0
+        while page_num <= self.max_filtration - 1:
+            LOG.info(f"Computing page={page_num} of spectral sequence")
+            LOG.info(poincare_poly)
+            LOG.info(ranks)
+            LOG.info(self._matrices)
+            page_data = list()
+            untouched_indices = set(ranks.keys())
+            while len(untouched_indices) > 0:
+                # collect all of the data according to one line on the page and add it to page_data
+                # starting with some random unanalyzed index
+                filt, deg = untouched_indices.pop()
+                cx_indices = [(filt, deg)]
+                for f, d in untouched_indices.copy():
+                    # (filt, deg) -> (filt - page_num, deg - 1) -> (filt - 2 (page_num), deg - 2)
+                    # f = filt + (d - deg)(page_num)
+                    if f == filt + (d - deg)*page_num:
+                        cx_indices.append((f, d))
+                        untouched_indices.remove((f, d))
+                # throw out these variables as I want to reuse their names
+                del filt
+                del deg
+
+                cx_differentials = {
+                    deg: self._matrices[(filt, filt - page_num, deg)]
+                    for filt, deg in cx_indices
+                    if (filt, filt - page_num, deg) in self._matrices.keys()
+                }
+                cx_ranks = {
+                    deg: ranks[(filt, deg)]
+                    for filt, deg in cx_indices
+                }
+                try:
+                    page_data.append(
+                        {
+                            'cx': MatrixChainComplex(
+                                    ranks=cx_ranks,
+                                    differentials=cx_differentials,
+                                    coeff_mod=self.coeff_mod,
+                                    grading_mod=self.grading_mod
+                                ),
+                            'indices': cx_indices
+                        }
+                    )
+                except Exception as e:
+                    LOG.info(f"failed MCC init at page_num={page_num}")
+                    LOG.info(cx_ranks)
+                    LOG.info(cx_differentials)
+                    raise e
+            # throw out the ranks and matrices which are used for the current page
+            # don't need these for further computation
+            page_indices = list()
+            for data in page_data:
+                page_indices += data['indices']
+            page_triple_indices = [(filt, filt - page_num, deg) for filt, deg in page_indices]
+            self._matrices = {k: v for k, v in self._matrices.items() if k not in page_triple_indices}
+
+            # compute qrs decomposition of each complex in the page and
+            # gather into transformation data for the next page
+            page_q = dict()
+            page_q_inv = dict()
+            page_s = dict()
+            page_s_inv = dict()
+            LOG.info(f"len(page_data)={len(page_data)} @ page_num={page_num}")
+            new_ranks = dict()
+            while len(page_data) > 0:
+                data = page_data.pop()
+                data['cx'].set_qrs_decomposition()
+                for filt, deg in data['indices']:
+                    # add contributions to the specseq homology ranks and poincare polynomial
+                    betti = data['cx'].rank_homology(deg)
+                    rank_homology[(page_num + 1, filt, deg)] = betti
+                    new_ranks[(filt, deg)] = betti
+                    poincare_poly += betti * (DEGREE_VAR ** deg) * (FILTRATION_VAR ** filt) * (PAGE_VAR ** page_num)
+                    # add the transformation data
+                    if deg in data['cx'].qrs_decomposition.keys():
+                        page_q[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q']
+                        page_q_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q_inv']
+                        page_s[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s']
+                        page_s_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s_inv']
+            ranks = new_ranks
+
+            # manual override prevents us from applying a bunch of unneeded transformations below
+            if page_num == self.max_filtration - 1:
+                break
+            # update self.matrices by applying matrix mult and slicing only the relevant indices
+            for filt_dom, filt_target, deg in self._matrices.keys():
+                mat = self._matrices[(filt_dom, filt_target, deg)]
+                if mat is None or 0 in mat.values.shape:
+                    continue
+                # now replace mat with
+                # S_{filt_target, deg - 1} * Q_{filt_target, deg}^{-1} * mat * Q_{filt, deg+1} * S_{filt, deg}^{-1}
+                # and slice to get the first b^{r}_{filt_target, deg-1} rows and first b^{r}_{filt, deg} columns
+                if (filt_dom, deg + 1) in page_q.keys():
+                    mat *= page_q[(filt_dom, deg + 1)]
+                if (filt_dom, deg) in page_s_inv.keys():
+                    mat *= page_s_inv[(filt_dom, deg)]
+                if (filt_target, deg) in page_q_inv.keys():
+                    mat = page_s_inv[(filt_target, deg)] * mat
+                if (filt_target, deg-1) in page_s.keys():
+                    mat = page_s[(filt_target, deg-1)] * mat
+                mat = mat.values[
+                      :rank_homology.get((page_num + 1, filt_target, deg - 1), 0),
+                      :rank_homology.get((page_num + 1, filt_dom, deg), 0),
+                      ]
+                self._matrices[(filt_dom, filt_target, deg)] = Matrix(mat, coeff_mod=self.coeff_mod)
+            page_num += 1
+        self._poincare_poly = poincare_poly
+        return self._poincare_poly
+
+    def _verify_z_grading(self):
+        if self.grading_mod != 0:
+            raise NotImplementedError("Spectral sequences only implemented for Z graded complexes")
+
+    def _set_filtered_vars(self):
+        filtration_values = self.filtration_levels.values()
+        max_filt = max(filtration_values)
+        min_filt = min(filtration_values)
+        filtered_vars = dict()
+        for filt_level in range(min_filt, max_filt + 1):
+            for deg in range(self.min_grading, self.max_grading + 1):
+                fv = self.get_generators_by_filtration(filt_level)
+                vars = [v for v in self.get_generators_by_grading(deg) if v in fv]
+                filtered_vars[(filt_level, deg)] = sorted(vars, key=str)
+        self._filtered_vars = filtered_vars
+
+    def _set_filtered_differentials(self):
+        """Sets filtered differentials as expressions"""
+        diffs = dict()
+        for i, deg in list(self._filtered_vars.keys()):
+            for j in [f[0] for f in list(self._filtered_vars.keys()) if f[0] <= i]:
+                non_j_vars_subs = {k: 0 for k, v in self.filtration_levels.items() if v != j}
+                diffs[(i, j, deg)] = {
+                    k: sympy.sympify(v.expression).subs(non_j_vars_subs)
+                    for k, v in self.differentials.items()
+                    if k in self._filtered_vars[(i, deg)]
+                }
+        self._filtered_diffs = diffs
+
+    def _set_initial_matrices(self):
+        mats = dict()
+        for k in self._filtered_diffs.keys():
+            i, j, deg = k
+            linear_map = LinearMap(
+                coeff_dict=self._filtered_diffs[k],
+                range_symbols=self._filtered_vars.get((j, deg - 1), list()),
+                coeff_mod=self.coeff_mod
+            )
+            mats[k] = linear_map.matrix
+        self._matrices = mats
 
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0,
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0, spec_poly=False,
                  lazy_aug_data=False, lazy_augs=False, lazy_bilin=False, aug_fill_na=None):
         super(DGA, self).__init__(
             gradings=gradings,
@@ -374,6 +920,9 @@ class DGA(DGBase):
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
+        if spec_poly and grading_mod != 0:
+            raise ValueError(f"Spectral sequence computations only available when grading_mod=0 != {grading_mod}")
+        self.spec_poly=spec_poly
         self.augmentations = None
         self.augmentations_compressed = None
         self.n_augs = None
@@ -477,21 +1026,31 @@ class DGA(DGBase):
 
     @utils.log_start_stop
     def set_all_bilin(self):
-        # How frequently to log?
         bilin_counter = 0
         for i in range(self.n_augs):
             for j in range(self.n_augs):
                 aug_1 = self.augmentations[i]
                 aug_2 = self.augmentations[j]
                 bilin_diff = self.get_bilin_differential(aug_1, aug_2)
-                cx = ChainComplex(
-                    gradings=self.gradings,
-                    differentials=bilin_diff,
-                    grading_mod=self.grading_mod,
-                    coeff_mod=self.coeff_mod
-                )
-                self.bilin_polys[(i,j)] = cx.poincare_poly
-                self.bilin_polys_dual[(i,j)] = cx.poincare_poly_dual
+                LOG.info(f"Computing bilinearized poincare poly for\n"
+                         f"gradings={self.gradings}\n"
+                         f"differentials={bilin_diff}")
+                if self.spec_poly:
+                    cx = SpectralSequence(
+                        gradings=self.gradings,
+                        filtration_levels=self.filtration_levels,
+                        differentials=bilin_diff,
+                        grading_mod=self.grading_mod,
+                        coeff_mod=self.coeff_mod,
+                    )
+                else:
+                    cx = ChainComplex(
+                        gradings=self.gradings,
+                        differentials=bilin_diff,
+                        grading_mod=self.grading_mod,
+                        coeff_mod=self.coeff_mod,
+                    )
+                self.bilin_polys[(i,j)] = cx.poincare_poly()
                 bilin_counter += 1
                 LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
         self.lin_poly_list = sorted(
