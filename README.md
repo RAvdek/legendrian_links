@@ -98,11 +98,45 @@ Now we can proceed with computing bilinearized homologies, etc. If the number of
 >>> pd.lch_dga.decompress_augmentations(fill_na=0)
 ```
 
-# Algebraic tools
+# Poincare polynomials
 
-The files `algebra.py` and `polynomials.py` contain tools for working with DGAs and chain complexes.
+The classes `ChainComplex`, `MatrixChainComplex`, and `SpectralSequence` all have `poincare_polynomial()` methods. The `DGA` class can use these to compute polynomials associated to (bi)linearized homologies. Our convention for polynomials of a chain complex yield
+```latex
+P(t) = \sum dim(H_{k})t^{k}.
+```
+For a spectral sequence, we set
+```latex
+P^{spec}(r, p, t) = \sum dim(E^{page}_{filt, deg})r^{page - 1}p^{filt}t^{deg}
+```
+where `page >= 1` is the page number, `filt` is the filtration degree of variables, and `deg` is the homological degree. Note that this convention does not agree with the Leray-Serre convention. In particular, differentials go
+```latex
+E^{page}_{filt, deg} --> E^{page}_{filt - page, deg-1}. 
+```
+
+In the following example, we compute the spectral sequence for the Morse homology of a heart-shaped sphere. The dots are critical points and the thin lines are Morse trajectories.
 
 <img src="./main/static/heart_sphere.png" width="50%">
+
+```python
+import sympy
+import algebra
+
+w, x, y, z = sympy.symbols('w,x,y,z')
+gradings = {w: 2, x: 2, y: 1, z: 0}
+differentials = {
+    w: algebra.Differential(y, coeff_mod=2),
+    x: algebra.Differential(y, coeff_mod=2),
+    y: algebra.Differential(0, coeff_mod=2),
+    z: algebra.Differential(0, coeff_mod=2)}
+filtration_levels = {w: 4, x: 3, y: 2, z: 1}
+specseq = algebra.SpectralSequence(
+    gradings=gradings, differentials=differentials, filtration_levels=filtration_levels, coeff_mod=2)
+p_poly = specseq.poincare_poly()
+```
+The result we get can be verified by hand:
+```python
+p_poly = p + (t * p**2) + (p**3 + p**4)*t**2 + (r + r**2 + r**3)*(p + (p**4)*(t**2)
+```
 
 # Testing
 

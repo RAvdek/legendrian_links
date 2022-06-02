@@ -543,6 +543,7 @@ class MatrixChainComplex(object):
 
     def __init__(self, ranks, differentials, coeff_mod=2, grading_mod=0):
         self.ranks = ranks
+        self._set_chi()
         self.grading_mod = grading_mod
         self.coeff_mod = coeff_mod
         if self.coeff_mod != 0:
@@ -566,8 +567,18 @@ class MatrixChainComplex(object):
             gradings = polynomials.finite_field_elements(self.grading_mod)
         else:
             gradings = range(self.min_grading, self.max_grading + 1)
+        poincare_chi = 0
         for grading in gradings:
-                output += self.rank_homology(grading) * (DEGREE_VAR ** grading)
+            poincare_chi += self.rank_homology(grading) * ((-1)**grading)
+            output += self.rank_homology(grading) * (DEGREE_VAR ** grading)
+        if poincare_chi != self.chi:
+            raise RuntimeError(f"chi={self.chi} computed from ranks "
+                               f"not matching chi={poincare_chi} computed "
+                               f"from poincare polynomial {output}.\n"
+                               f"ranks={self.ranks}\n"
+                               f"_dim_kers={self._dim_kers}\n"
+                               f"_dim_ims={self._dim_ims}\n"
+                               f"differentials={self.differentials}")
         self._poincare_poly = output
         return self._poincare_poly
 
@@ -643,6 +654,10 @@ class MatrixChainComplex(object):
                 )
             else:
                 expanded_ref = truncated_matrix.ref_q
+            # check that the expanded ref has the same dimensions as the original matrix
+            if current_matrix.values.shape != expanded_ref.values.shape:
+                raise RuntimeError(f"current_matrix.values.shape={current_matrix.values.shape} != "
+                                   f"expanded_ref.values.shape={expanded_ref.values.shape}")
             # Update gradings
             qrs_decomposition[current_grading] = {
                 "ref_q": truncated_matrix.ref_q,
@@ -671,6 +686,9 @@ class MatrixChainComplex(object):
                 previous_ref_q = truncated_matrix.ref_q
             current_grading -= 1
         self.qrs_decomposition = qrs_decomposition
+
+    def _set_chi(self):
+        self.chi = sum([v*((-1)**k) for k, v in self.ranks.items()])
 
     def _validate_differentials(self):
         for k, d in self.differentials.items():
@@ -858,7 +876,7 @@ class SpectralSequence(DGBase):
 
 class DGA(DGBase):
 
-    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0,
+    def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0, spec_poly=False,
                  lazy_aug_data=False, lazy_augs=False, lazy_bilin=False, aug_fill_na=None):
         super(DGA, self).__init__(
             gradings=gradings,
@@ -867,6 +885,9 @@ class DGA(DGBase):
             coeff_mod=coeff_mod,
             grading_mod=grading_mod
         )
+        if spec_poly and grading_mod != 0:
+            raise ValueError(f"Spectral sequence computations only available when grading_mod=0 != {grading_mod}")
+        self.spec_poly=spec_poly
         self.augmentations = None
         self.augmentations_compressed = None
         self.n_augs = None
@@ -976,12 +997,24 @@ class DGA(DGBase):
                 aug_1 = self.augmentations[i]
                 aug_2 = self.augmentations[j]
                 bilin_diff = self.get_bilin_differential(aug_1, aug_2)
-                cx = ChainComplex(
-                    gradings=self.gradings,
-                    differentials=bilin_diff,
-                    grading_mod=self.grading_mod,
-                    coeff_mod=self.coeff_mod,
-                )
+                LOG.info(f"Computing bilinearized poincare poly for\n"
+                         f"gradings={self.gradings}\n"
+                         f"differentials={bilin_diff}")
+                if self.spec_poly:
+                    cx = SpectralSequence(
+                        gradings=self.gradings,
+                        filtration_levels=self.filtration_levels,
+                        differentials=bilin_diff,
+                        grading_mod=self.grading_mod,
+                        coeff_mod=self.coeff_mod,
+                    )
+                else:
+                    cx = ChainComplex(
+                        gradings=self.gradings,
+                        differentials=bilin_diff,
+                        grading_mod=self.grading_mod,
+                        coeff_mod=self.coeff_mod,
+                    )
                 self.bilin_polys[(i,j)] = cx.poincare_poly()
                 bilin_counter += 1
                 LOG.info(f"Computed {bilin_counter} of {self.n_augs ** 2} bilinearized Poincare polys so far")
