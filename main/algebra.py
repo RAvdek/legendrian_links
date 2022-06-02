@@ -199,7 +199,7 @@ class Matrix(object):
         self.ref_free_indices = free_indices
         self.ref_form = self.REF
         if self.n_rows == self.n_cols:
-            det = utils.prod([self.ref_q.values[k, k] for k in range(self.n_cols)])
+            det = utils.prod([self.ref.values[k, k] for k in range(self.n_cols)])
             if self.coeff_mod != 0:
                 det %= self.coeff_mod
             self._det = det
@@ -260,7 +260,7 @@ class Matrix(object):
         if self.n_rows != self.n_cols:
             return ValueError("Trying to invert non-square matrix")
         if self.det() == 0:
-            raise ValueError("Trying to invert non-invertible matrix")
+            raise ValueError(f"Trying to invert non-invertible matrix,\n{self}")
         return self.ref_q_inv
 
     def _row_reduce(self, ref, ref_q, ref_q_inv, k, l):
@@ -529,9 +529,14 @@ class ChainComplex(DGBase):
             differentials[i] = LinearMap(
                 coeff_dict={s: self.differentials[s].expression for s in domain_symbols},
                 range_symbols=range_symbols,
-                coeff_mod=self.coeff_mod
+                coeff_mod=self.coeff_mod,
             ).matrix
-        self.matrix_cx = MatrixChainComplex(ranks=ranks, differentials=differentials, coeff_mod=self.coeff_mod)
+        self.matrix_cx = MatrixChainComplex(
+            ranks=ranks,
+            differentials=differentials,
+            coeff_mod=self.coeff_mod,
+            grading_mod=self.grading_mod
+        )
 
 
 class MatrixChainComplex(object):
@@ -574,7 +579,8 @@ class MatrixChainComplex(object):
         if poincare_chi != self.chi:
             raise RuntimeError(f"chi={self.chi} computed from ranks "
                                f"not matching chi={poincare_chi} computed "
-                               f"from poincare polynomial {output}.\n"
+                               f"from poincare polynomial {output}\n"
+                               f"self.grading_mod={self.grading_mod}\n"
                                f"ranks={self.ranks}\n"
                                f"_dim_kers={self._dim_kers}\n"
                                f"_dim_ims={self._dim_ims}\n"
@@ -584,6 +590,8 @@ class MatrixChainComplex(object):
 
     def rank_im(self, grading):
         """:return: int rank of image of differential at specified grading degree"""
+        if self.grading_mod != 0:
+            grading %= self.grading_mod
         if grading in self._dim_ims.keys():
             return self._dim_ims[grading]
         if grading not in self.differentials.keys():
@@ -594,6 +602,8 @@ class MatrixChainComplex(object):
 
     def rank_ker(self, grading):
         """:return: int rank of kernel of differential at specified grading degree"""
+        if self.grading_mod != 0:
+            grading %= self.grading_mod
         if grading in self._dim_kers.keys():
             return self._dim_kers[grading]
         if grading not in self.differentials.keys():
@@ -606,6 +616,7 @@ class MatrixChainComplex(object):
         """:return: int rank of homology at specified grading degree"""
         gr_plus_1 = grading + 1
         if self.grading_mod != 0:
+            grading = grading % self.grading_mod
             gr_plus_1 %= self.grading_mod
         return self.rank_ker(grading) - self.rank_im(gr_plus_1)
 
@@ -640,7 +651,7 @@ class MatrixChainComplex(object):
             # throw out the first columns of M_n Q_{n+1} which correspond to image of the previous del and compute RREF
             # We have to add back in the thrown out columns to recover R_n
             truncated_matrix = Matrix(
-                current_matrix.values[:, (current_matrix.n_cols - previous_im_rank - 1):],
+                current_matrix.values[:, previous_im_rank:],
                 coeff_mod=self.coeff_mod
             )
             truncated_matrix.set_red_row_echelon()
@@ -653,11 +664,13 @@ class MatrixChainComplex(object):
                     coeff_mod=self.coeff_mod
                 )
             else:
-                expanded_ref = truncated_matrix.ref_q
+                expanded_ref = truncated_matrix.ref
             # check that the expanded ref has the same dimensions as the original matrix
             if current_matrix.values.shape != expanded_ref.values.shape:
                 raise RuntimeError(f"current_matrix.values.shape={current_matrix.values.shape} != "
-                                   f"expanded_ref.values.shape={expanded_ref.values.shape}")
+                                   f"expanded_ref.values.shape={expanded_ref.values.shape}.\n"
+                                   f"previous_im_rank={previous_im_rank},\n"
+                                   f"truncated_matrix.values.shape={truncated_matrix.values.shape}")
             # Update gradings
             qrs_decomposition[current_grading] = {
                 "ref_q": truncated_matrix.ref_q,
@@ -742,92 +755,107 @@ class SpectralSequence(DGBase):
         rank_homology = dict()
         poincare_poly = 0
         page_num = 0
-        while page_num <= self.max_filtration - 1:
+        while page_num <= self.max_filtration:
             LOG.info(f"Computing page={page_num} of spectral sequence")
             LOG.info(poincare_poly)
             LOG.info(ranks)
             LOG.info(self._matrices)
-            # set chain complexes at the page, indexes by the p for which (deg=0, p) is in the chain
-            page_cxs = dict()
-            min_p = min(1, self.max_filtration - page_num * max(self.max_grading, 0))
-            max_p = max(1, self.max_filtration + page_num * self.max_grading + 1)
-            for p in range(min_p, max_p):
-                possible_indices = [
-                    (p + page_num * deg, deg)
-                    for deg in range(self.min_grading, self.max_grading + 1)
-                ]
-                min_deg = min([k[1] for k in possible_indices])
-                max_deg = max([k[1] for k in possible_indices])
+            page_data = list()
+            untouched_indices = set(ranks.keys())
+            while len(untouched_indices) > 0:
+                # collect all of the data according to one line on the page and add it to page_data
+                # starting with some random unanalyzed index
+                filt, deg = untouched_indices.pop()
+                cx_indices = [(filt, deg)]
+                for f, d in untouched_indices.copy():
+                    # (filt, deg) -> (filt - page_num, deg - 1) -> (filt - 2 (page_num), deg - 2)
+                    # f = filt + (d - deg)(page_num)
+                    if f == filt + (d - deg)*page_num:
+                        cx_indices.append((f, d))
+                        untouched_indices.remove((f, d))
+                # throw out these variables as I want to reuse their names
+                del filt
+                del deg
 
-                differentials = {
-                    deg: self._matrices[(p + page_num * deg, p + page_num * (deg - 1), deg)]
-                    for deg in range(min_deg, max_deg + 1)
-                    if (p + page_num * deg, p + page_num * (deg - 1), deg) in self._matrices.keys()
+                cx_differentials = {
+                    deg: self._matrices[(filt, filt - page_num, deg)]
+                    for filt, deg in cx_indices
+                    if (filt, filt - page_num, deg) in self._matrices.keys()
                 }
                 cx_ranks = {
-                    deg: ranks.get((p + page_num * deg, deg), 0)
-                    for deg in range(self.min_grading, self.max_grading + 1)
+                    deg: ranks[(filt, deg)]
+                    for filt, deg in cx_indices
                 }
                 try:
-                    page_cxs[p] = MatrixChainComplex(
-                        ranks=cx_ranks,
-                        differentials=differentials,
-                        coeff_mod=self.coeff_mod
+                    page_data.append(
+                        {
+                            'cx': MatrixChainComplex(
+                                    ranks=cx_ranks,
+                                    differentials=cx_differentials,
+                                    coeff_mod=self.coeff_mod,
+                                    grading_mod=self.grading_mod
+                                ),
+                            'indices': cx_indices
+                        }
                     )
                 except Exception as e:
-                    LOG.info(f"failed MCC init at page_num={page_num}, p={p}")
+                    LOG.info(f"failed MCC init at page_num={page_num}")
                     LOG.info(cx_ranks)
-                    LOG.info(differentials)
+                    LOG.info(cx_differentials)
                     raise e
-                # compute qrs decomposition of each complex
-                page_cxs[p].set_qrs_decomposition()
-                # add contributions to the specseq homology ranks and poincare polynomial
-                for deg in range(self.min_grading, self.max_grading + 1):
-                    filt = p + page_num * deg
-                    betti = page_cxs[p].rank_homology(deg)
+            # throw out the ranks and matrices which are used for the current page
+            # don't need these for further computation
+            page_indices = list()
+            for data in page_data:
+                page_indices += data['indices']
+            page_triple_indices = [(filt, filt - page_num, deg) for filt, deg in page_indices]
+            ranks = {k: v for k, v in ranks.items() if k not in page_indices}
+            self._matrices = {k: v for k, v in self._matrices.items() if k not in page_triple_indices}
+
+            # compute qrs decomposition of each complex in the page and
+            # gather into transformation data for the next page
+            page_q = dict()
+            page_q_inv = dict()
+            page_s = dict()
+            page_s_inv = dict()
+            while len(page_data) > 0:
+                data = page_data.pop()
+                data['cx'].set_qrs_decomposition()
+                for filt, deg in data['indices']:
+                    # add contributions to the specseq homology ranks and poincare polynomial
+                    betti = data['cx'].rank_homology(deg)
                     rank_homology[(page_num + 1, filt, deg)] = betti
                     poincare_poly += betti * (DEGREE_VAR ** deg) * (FILTRATION_VAR ** filt) * (PAGE_VAR ** page_num)
+                    # add the transformation data
+                    if deg in data['cx'].qrs_decomposition.keys():
+                        page_q[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q']
+                        page_q_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q_inv']
+                        page_s[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s']
+                        page_s_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s_inv']
 
-            # at this point we can throw out the matrices which are used for the current page
-            possible_triple_indices = [
-                (p + page_num * deg, p + page_num * (deg - 1), deg)
-                for deg in range(self.min_grading, self.max_grading + 1)
-                for p in range(1, self.max_grading + 1)
-            ]
-            ranks = {
-                (filt, deg): rank_homology.get((page_num + 1, filt, deg), 0)
-                for deg in range(self.min_grading, self.max_grading + 1)
-                for filt in range(1, self.max_filtration + 1)
-            }
-            ranks = {k: v for k, v in ranks.items() if v != 0}
-            self._matrices = {k: v for k, v in self._matrices.items() if k not in possible_triple_indices}
+            if page_num == self.max_filtration - 1:
+                break
             # update self.matrices by applying matrix mult and slicing only the relevant indices
-            for p in range(min_p, max_p):
-                for deg in range(self.min_grading, self.max_grading + 1):
-                    for p_target in range(1, p+1):
-                        mat = self._matrices.get((p, p_target, deg))
-                        if mat is None or 0 in mat.values.shape:
-                            continue
-                        # now replace mat with
-                        # S_{p_target, deg - 1} * Q_{p_target, deg}^{-1} * mat * Q_{p, deg+1} * S_{p, deg}^{-1}
-                        # and slice to get the first b^{r}_{p_target, deg-1} rows and first b^{r}_{p, deg} columns
-                        if p - page_num * (deg + 1) in page_cxs.keys():
-                            if deg in page_cxs[p - page_num * (deg + 1)].qrs_decomposition.keys():
-                                mat *= page_cxs[p - page_num * (deg + 1)].qrs_decomposition[deg]["ref_q"]
-                        if p - page_num * deg in page_cxs.keys():
-                            if deg in page_cxs[p - page_num * deg].qrs_decomposition.keys():
-                                mat *= page_cxs[p - page_num * deg].qrs_decomposition[deg]["s_inv"]
-                        if p - page_num * deg in page_cxs.keys():
-                            if deg in page_cxs[p - page_num * deg].qrs_decomposition.keys():
-                                mat = page_cxs[p - page_num * deg].qrs_decomposition[deg]["ref_q_inv"] * mat
-                        if p - page_num * (deg - 1) in page_cxs.keys():
-                            if deg in page_cxs[p - page_num * (deg - 1)].qrs_decomposition.keys():
-                                mat = page_cxs[p - page_num * (deg - 1)].qrs_decomposition[deg]["s"] * mat
-                        mat = mat.values[
-                              :rank_homology.get((page_num + 1, p_target, deg - 1), 0),
-                              :rank_homology.get((page_num + 1, p, deg), 0),
-                        ]
-                        self._matrices[p, p_target, deg] = Matrix(mat, coeff_mod=self.coeff_mod)
+            for filt_dom, filt_target, deg in self._matrices.keys():
+                mat = self._matrices[(filt_dom, filt_target, deg)]
+                if mat is None or 0 in mat.values.shape:
+                    continue
+                # now replace mat with
+                # S_{filt_target, deg - 1} * Q_{filt_target, deg}^{-1} * mat * Q_{filt, deg+1} * S_{filt, deg}^{-1}
+                # and slice to get the first b^{r}_{filt_target, deg-1} rows and first b^{r}_{filt, deg} columns
+                if (filt_dom, deg + 1) in page_q.keys():
+                    mat *= page_q[(filt_dom, deg + 1)]
+                if (filt_dom, deg) in page_s_inv.keys():
+                    mat *= page_s_inv[(filt_dom, deg)]
+                if (filt_target, deg) in page_q_inv.keys():
+                    mat = page_s_inv[(filt_target, deg)] * mat
+                if (filt_target, deg-1) in page_s.keys():
+                    mat = page_s[(filt_target, deg-1)] * mat
+                mat = mat.values[
+                      :rank_homology.get((page_num + 1, filt_target, deg - 1), 0),
+                      :rank_homology.get((page_num + 1, filt_dom, deg), 0),
+                      ]
+                self._matrices[(filt_dom, filt_target, deg)] = Matrix(mat, coeff_mod=self.coeff_mod)
             page_num += 1
         self._poincare_poly = poincare_poly
         return self._poincare_poly
