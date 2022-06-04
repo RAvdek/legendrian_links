@@ -11,7 +11,7 @@ import utils
 import legendrian_links as ll
 
 
-LOG = utils.LOG
+LOG = utils.get_logger(__name__)
 
 # Link resources
 LINKS = utils.LINKS

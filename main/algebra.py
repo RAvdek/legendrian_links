@@ -5,7 +5,7 @@ import sympy
 import utils
 import polynomials
 
-LOG = utils.LOG
+LOG = utils.get_logger(__name__)
 PAGE_VAR = sympy.Symbol('r', commutative=True)
 FILTRATION_VAR = sympy.Symbol('p', commutative=True)
 DEGREE_VAR = sympy.Symbol('t', commutative=True)
@@ -693,6 +693,12 @@ class MatrixChainComplex(object):
             for col_num in r_n_pivots_cols:
                 s_matrix_rows.append(utils.one_hot_array(col_num + previous_im_rank, current_matrix.n_cols))
             s_matrix = Matrix(s_matrix_rows, coeff_mod=self.coeff_mod)
+            if not s_matrix.n_cols == current_matrix.n_cols:
+                raise RuntimeError(f"s_matrix.n_cols = {s_matrix.n_cols} "
+                                   f"!= current_matrix.n_cols = {current_matrix.n_cols}")
+            if not s_matrix.n_rows == current_matrix.n_cols:
+                raise RuntimeError(f"s_matrix.n_rows = {s_matrix.n_rows} "
+                                   f"!= current_matrix.n_cols = {current_matrix.n_cols}")
             qrs_decomposition[current_grading]["s"] = s_matrix
             qrs_decomposition[current_grading]["s_inv"] = s_matrix.get_inverse()
 
@@ -751,20 +757,21 @@ class SpectralSequence(DGBase):
         self._set_filtered_differentials()
         self._set_initial_matrices()
 
-        # ranks[(filt, deg)] = # variables with prescribed filtration level and degree
-        # on page r, this will be the rank of E^{p}_{filt, deg}
-        ranks = {k: len(v) for k, v in self._filtered_vars.items()}
-        ranks = {k: v for k, v in ranks.items() if v != 0}
         rank_homology = dict()
         poincare_poly = 0
         page_num = 0
+        # ranks[(filt, deg)] = # variables with prescribed filtration level and degree
+        # on page r, this will be the rank of E^{p}_{filt, deg}
+        page_ranks = {k: len(v) for k, v in self._filtered_vars.items()}
+        page_ranks = {k: v for k, v in page_ranks.items() if v != 0}
         while page_num <= self.max_filtration - 1:
-            LOG.info(f"Computing page={page_num} of spectral sequence")
-            LOG.info(poincare_poly)
-            LOG.info(ranks)
-            LOG.info(self._matrices)
+            shapes = {k: v.values.shape for k, v in self._matrices.items()}
+            LOG.info(f"Computing page={page_num} of spectral sequence using \n"
+                     f"ranks = {page_ranks},\n"
+                     f"matrix shapes = {shapes}")
+            self._verify_matrix_dimensions()
             page_data = list()
-            untouched_indices = set(ranks.keys())
+            untouched_indices = set(page_ranks.keys())
             while len(untouched_indices) > 0:
                 # collect all of the data according to one line on the page and add it to page_data
                 # starting with some random unanalyzed index
@@ -779,6 +786,8 @@ class SpectralSequence(DGBase):
                 # throw out these variables as I want to reuse their names
                 del filt
                 del deg
+                cx_indices.sort(key=lambda pair: pair[1], reverse=True)
+                LOG.info(f"Analyzing line on page_num={page_num} with indices {cx_indices}")
 
                 cx_differentials = {
                     deg: self._matrices[(filt, filt - page_num, deg)]
@@ -786,26 +795,20 @@ class SpectralSequence(DGBase):
                     if (filt, filt - page_num, deg) in self._matrices.keys()
                 }
                 cx_ranks = {
-                    deg: ranks[(filt, deg)]
+                    deg: page_ranks[(filt, deg)]
                     for filt, deg in cx_indices
                 }
-                try:
-                    page_data.append(
-                        {
-                            'cx': MatrixChainComplex(
-                                    ranks=cx_ranks,
-                                    differentials=cx_differentials,
-                                    coeff_mod=self.coeff_mod,
-                                    grading_mod=self.grading_mod
-                                ),
-                            'indices': cx_indices
-                        }
-                    )
-                except Exception as e:
-                    LOG.info(f"failed MCC init at page_num={page_num}")
-                    LOG.info(cx_ranks)
-                    LOG.info(cx_differentials)
-                    raise e
+                page_data.append(
+                    {
+                        'cx': MatrixChainComplex(
+                                ranks=cx_ranks,
+                                differentials=cx_differentials,
+                                coeff_mod=self.coeff_mod,
+                                grading_mod=self.grading_mod
+                            ),
+                        'indices': cx_indices
+                    }
+                )
             # throw out the ranks and matrices which are used for the current page
             # don't need these for further computation
             page_indices = list()
@@ -820,7 +823,7 @@ class SpectralSequence(DGBase):
             page_q_inv = dict()
             page_s = dict()
             page_s_inv = dict()
-            LOG.info(f"len(page_data)={len(page_data)} @ page_num={page_num}")
+            LOG.info(f"Computed {len(page_data)} chain complexes on page_num={page_num}")
             new_ranks = dict()
             while len(page_data) > 0:
                 data = page_data.pop()
@@ -831,13 +834,14 @@ class SpectralSequence(DGBase):
                     rank_homology[(page_num + 1, filt, deg)] = betti
                     new_ranks[(filt, deg)] = betti
                     poincare_poly += betti * (DEGREE_VAR ** deg) * (FILTRATION_VAR ** filt) * (PAGE_VAR ** page_num)
-                    # add the transformation data
+                    # add the transformation data going from
+                    # (filt, deg) -> (filt - page_num * deg, deg - 1)
                     if deg in data['cx'].qrs_decomposition.keys():
                         page_q[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q']
                         page_q_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['ref_q_inv']
                         page_s[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s']
                         page_s_inv[(filt, deg)] = data['cx'].qrs_decomposition[deg]['s_inv']
-            ranks = new_ranks
+            page_ranks = new_ranks
 
             # manual override prevents us from applying a bunch of unneeded transformations below
             if page_num == self.max_filtration - 1:
@@ -850,14 +854,18 @@ class SpectralSequence(DGBase):
                 # now replace mat with
                 # S_{filt_target, deg - 1} * Q_{filt_target, deg}^{-1} * mat * Q_{filt, deg+1} * S_{filt, deg}^{-1}
                 # and slice to get the first b^{r}_{filt_target, deg-1} rows and first b^{r}_{filt, deg} columns
-                if (filt_dom, deg + 1) in page_q.keys():
-                    mat *= page_q[(filt_dom, deg + 1)]
-                if (filt_dom, deg) in page_s_inv.keys():
-                    mat *= page_s_inv[(filt_dom, deg)]
-                if (filt_target, deg) in page_q_inv.keys():
-                    mat = page_s_inv[(filt_target, deg)] * mat
-                if (filt_target, deg-1) in page_s.keys():
-                    mat = page_s[(filt_target, deg-1)] * mat
+                try:
+                    if (filt_dom, deg + 1) in page_q.keys():
+                        mat *= page_q[(filt_dom, deg + 1)]
+                    if (filt_dom, deg) in page_s_inv.keys():
+                        mat *= page_s_inv[(filt_dom, deg)]
+                    if (filt_target, deg) in page_q_inv.keys():
+                        mat = page_q_inv[(filt_target, deg)] * mat
+                    if (filt_target, deg-1) in page_s.keys():
+                        mat = page_s[(filt_target, deg-1)] * mat
+                except ValueError as e:
+                    LOG.info(f"Failed at filt_dom, filt_target, deg = {filt_dom}, {filt_target}, {deg}")
+                    raise e
                 mat = mat.values[
                       :rank_homology.get((page_num + 1, filt_target, deg - 1), 0),
                       :rank_homology.get((page_num + 1, filt_dom, deg), 0),
@@ -886,7 +894,7 @@ class SpectralSequence(DGBase):
     def _set_filtered_differentials(self):
         """Sets filtered differentials as expressions"""
         diffs = dict()
-        for i, deg in list(self._filtered_vars.keys()):
+        for i, deg in self._filtered_vars.keys():
             for j in [f[0] for f in list(self._filtered_vars.keys()) if f[0] <= i]:
                 non_j_vars_subs = {k: 0 for k, v in self.filtration_levels.items() if v != j}
                 diffs[(i, j, deg)] = {
@@ -907,6 +915,22 @@ class SpectralSequence(DGBase):
             )
             mats[k] = linear_map.matrix
         self._matrices = mats
+
+    def _verify_matrix_dimensions(self):
+        ranks = dict()
+        for k in self._matrices.keys():
+            filt_dom, filt_target, deg = k
+            mat = self._matrices[k]
+            if (filt_dom, deg) not in ranks:
+                ranks[(filt_dom, deg)] = mat.n_cols
+            else:
+                if ranks[(filt_dom, deg)] != mat.n_cols:
+                    raise ValueError()
+            if (filt_target, deg - 1) not in ranks:
+                ranks[(filt_target, deg - 1)] = mat.n_rows
+            else:
+                if ranks[(filt_target, deg - 1)] != mat.n_rows:
+                    raise ValueError()
 
 
 class DGA(DGBase):

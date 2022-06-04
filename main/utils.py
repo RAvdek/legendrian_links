@@ -6,6 +6,7 @@ import random
 import signal
 import string
 import threading
+import jinja2
 import sympy
 
 
@@ -17,7 +18,7 @@ with open('links.json') as f:
 
 
 def get_logger(name):
-    logging.basicConfig(format='%(asctime)s|%(name)s|%(levelname)s|%(message)s')
+    logging.basicConfig(format='%(asctime)s|%(name)s:%(lineno)d|%(levelname)s|%(message)s')
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     return logger

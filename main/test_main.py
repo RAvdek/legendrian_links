@@ -10,7 +10,7 @@ import algebra
 import legendrian_links as ll
 
 
-LOG = utils.LOG
+LOG = utils.get_logger(__name__)
 
 
 def comparable_list_of_dicts(l):

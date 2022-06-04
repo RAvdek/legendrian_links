@@ -3,7 +3,7 @@ import sympy
 import utils
 
 
-LOG = utils.LOG
+LOG = utils.get_logger(__name__)
 # How long (in seconds) before we abandon computing Groebner bases?
 GROEBNER_TIMEOUT_DEFAULT = .1
 UNSET_VAR = None

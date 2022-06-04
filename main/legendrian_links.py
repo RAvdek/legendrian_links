@@ -3,7 +3,7 @@ import algebra
 import utils
 
 
-LOG = utils.LOG
+LOG = utils.get_logger(__name__)
 ZZ = sympy.ZZ
 ZZ2 = sympy.GF(2)
 HALF = sympy.Rational(1, 2)
