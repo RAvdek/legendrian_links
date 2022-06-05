@@ -4,7 +4,7 @@ An interactive application for analyzing Legendrian links. This project is curre
 
 Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra and be able to handle heavy computations. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
 
-The program computes augmentations of LCH algebras and [planar diagram algebra](https://arxiv.org/abs/2205.13031). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
+The program computes augmentations of LCH algebras and [planar diagram algebras](https://arxiv.org/abs/2205.13031). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
 
 # Installation
 
@@ -31,9 +31,9 @@ Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1
 Here is a complete list of url arguments:
 - `n_strands`: How many strands of the plat? Must be a positive even integer.
 - `crossings`: Crossings of the plat in the front projection. This will be resolved using Lagrangian resolution.
-- `lazy_disks`: True or False. If True, just print the plat diagram and list the chords.
 - `auto_dgas`: `lch`, `rsft`, or both (`lch,rsft`). Which DGAs should we analyze? Here `rsft` is the planar diagram algebra.
 - `mirror`: If True, reverse order of the the front_crossings.
+- `n_copy`: If provided with an integer, will make an n-copy diagram.
 - `orientation_flips`: Comma separated list of True/False. Will change the orientations of the link components.
 - `aug_fill_na`: 0 or 1 if used. Use only is there are many augmentations. Augmentations will always be computed with some variables set to `None` (meaning that they could take on any value, 0 or 1). If `aug_fill_na` is not None, we use this number to fill in these values.
 - `spec_poly`: If True and `auto_dgas=rsft`, will compute the spectral sequence polynomials associated to bilinearizations as described in [the article](https://arxiv.org/abs/2205.13031).
@@ -115,10 +115,10 @@ P^{spec}(r, p, t) = \sum dim(E^{page}_{filt, deg})r^{page - 1}p^{filt}t^{deg}
 ```
 where `page >= 1` is the page number, `filt` is the filtration degree of variables, and `deg` is the homological degree. Note that this convention does not agree with the Leray-Serre convention. In particular, differentials go
 ```latex
-E^{page}_{filt, deg} --> E^{page}_{filt - page, deg-1}. 
+E^{page}_{filt, deg} --> E^{page}_{filt - page + 1, deg-1}. 
 ```
 
-In the following example, we compute the spectral sequence for the Morse homology of a heart-shaped sphere. The dots are critical points and the thin lines are Morse trajectories.
+The `SpectralSequence` class is available for filtered, Z-graded chain complexes (meaning `grading_mod = 0`). In the following example, we compute the spectral sequence for the Morse homology of a heart-shaped sphere. The dots are critical points and the thin lines are Morse trajectories.
 
 <img src="./main/static/heart_sphere.png" width="50%">
 
@@ -151,7 +151,7 @@ $ pwd
 .../legendrian_links/main
 $ python test_main.py
 ```
-Tests should be added for any new features. It is also helpful to use the web application to check examples during development.
+Tests should be added for any new features. It is also helpful to use the web application to check examples during development. When bugs are discovered, it is best to add new tests. In the least, new exception handling should be added which spots the issue.
 
 # Technical notes
 
@@ -185,6 +185,7 @@ I cannot guarantee that this is not a bad idea!
 ## Features
 
 - Capping paths is storing too much info. We really only need this for rotation numbers.
+- Ability to import as a library (eg. for use in Jupyter).
 - Normalized euler characteristic and normalized augmentation count.
 - Compute the full augmentation tree?
 - Tools for decompressing augmentations. We want to control the order of augmentations so that we can track them by indices.
@@ -211,7 +212,6 @@ I cannot guarantee that this is not a bad idea!
 - dga.py needs tests for differentials and DGA class methods.
 - Add pylint or something to ensure code cleanliness.
 - Review relationships between data structures.
-- Make `legendrian_links` importable as a python library.
 
 ## Data sets
 

@@ -762,9 +762,10 @@ class SpectralSequence(DGBase):
         page_num = 0
         # ranks[(filt, deg)] = # variables with prescribed filtration level and degree
         # on page r, this will be the rank of E^{p}_{filt, deg}
+        # We'll throw out the ones with zero rank
         page_ranks = {k: len(v) for k, v in self._filtered_vars.items()}
         page_ranks = {k: v for k, v in page_ranks.items() if v != 0}
-        while page_num <= self.max_filtration - 1:
+        while page_num < self.max_filtration:
             shapes = {k: v.values.shape for k, v in self._matrices.items()}
             LOG.info(f"Computing page={page_num} of spectral sequence using \n"
                      f"ranks = {page_ranks},\n"
@@ -777,6 +778,7 @@ class SpectralSequence(DGBase):
                 # starting with some random unanalyzed index
                 filt, deg = untouched_indices.pop()
                 cx_indices = [(filt, deg)]
+                # Using a copy so we don't modify the list during iteration
                 for f, d in untouched_indices.copy():
                     # (filt, deg) -> (filt - page_num, deg - 1) -> (filt - 2 (page_num), deg - 2)
                     # f = filt + (d - deg)(page_num)
@@ -786,18 +788,18 @@ class SpectralSequence(DGBase):
                 # throw out these variables as I want to reuse their names
                 del filt
                 del deg
+                # sort the indices by their degrees (descending)
                 cx_indices.sort(key=lambda pair: pair[1], reverse=True)
                 LOG.info(f"Analyzing line on page_num={page_num} with indices {cx_indices}")
 
+                # organize differentials and ranks by degree to set up matrix chain complex
                 cx_differentials = {
-                    deg: self._matrices[(filt, filt - page_num, deg)]
-                    for filt, deg in cx_indices
-                    if (filt, filt - page_num, deg) in self._matrices.keys()
+                    loc_dom[1]: self._matrices[(loc_dom, loc_target)]
+                    for loc_dom in cx_indices
+                    for loc_target in cx_indices
+                    if (loc_dom, loc_target) in self._matrices.keys()
                 }
-                cx_ranks = {
-                    deg: page_ranks[(filt, deg)]
-                    for filt, deg in cx_indices
-                }
+                cx_ranks = {deg: page_ranks[(filt, deg)] for filt, deg in cx_indices}
                 page_data.append(
                     {
                         'cx': MatrixChainComplex(
@@ -810,12 +812,12 @@ class SpectralSequence(DGBase):
                     }
                 )
             # throw out the ranks and matrices which are used for the current page
-            # don't need these for further computation
+            # don't need these for computation of future pages
             page_indices = list()
             for data in page_data:
                 page_indices += data['indices']
-            page_triple_indices = [(filt, filt - page_num, deg) for filt, deg in page_indices]
-            self._matrices = {k: v for k, v in self._matrices.items() if k not in page_triple_indices}
+            this_page_indices = [((filt, deg), (filt - page_num, deg-1)) for filt, deg in page_indices]
+            self._matrices = {k: v for k, v in self._matrices.items() if k not in this_page_indices}
 
             # compute qrs decomposition of each complex in the page and
             # gather into transformation data for the next page
@@ -847,13 +849,20 @@ class SpectralSequence(DGBase):
             if page_num == self.max_filtration - 1:
                 break
             # update self.matrices by applying matrix mult and slicing only the relevant indices
-            for filt_dom, filt_target, deg in self._matrices.keys():
-                mat = self._matrices[(filt_dom, filt_target, deg)]
+            new_matrices = dict()
+            for loc_dom, loc_target in self._matrices.keys():
+                if page_ranks.get(loc_dom, 0) == 0 or page_ranks.get(loc_target, 0) == 0:
+                    continue
+                mat = self._matrices[(loc_dom, loc_target)]
                 if mat is None or 0 in mat.values.shape:
                     continue
                 # now replace mat with
                 # S_{filt_target, deg - 1} * Q_{filt_target, deg}^{-1} * mat * Q_{filt, deg+1} * S_{filt, deg}^{-1}
                 # and slice to get the first b^{r}_{filt_target, deg-1} rows and first b^{r}_{filt, deg} columns
+                filt_dom, deg = loc_dom
+                filt_target, deg_target = loc_target
+                if not deg_target == deg - 1:
+                    raise ValueError()
                 try:
                     if (filt_dom, deg + 1) in page_q.keys():
                         mat *= page_q[(filt_dom, deg + 1)]
@@ -870,7 +879,8 @@ class SpectralSequence(DGBase):
                       :rank_homology.get((page_num + 1, filt_target, deg - 1), 0),
                       :rank_homology.get((page_num + 1, filt_dom, deg), 0),
                       ]
-                self._matrices[(filt_dom, filt_target, deg)] = Matrix(mat, coeff_mod=self.coeff_mod)
+                new_matrices[(loc_dom, loc_target)] = Matrix(mat, coeff_mod=self.coeff_mod)
+            self._matrices = new_matrices
             page_num += 1
         self._poincare_poly = poincare_poly
         return self._poincare_poly
@@ -880,11 +890,8 @@ class SpectralSequence(DGBase):
             raise NotImplementedError("Spectral sequences only implemented for Z graded complexes")
 
     def _set_filtered_vars(self):
-        filtration_values = self.filtration_levels.values()
-        max_filt = max(filtration_values)
-        min_filt = min(filtration_values)
         filtered_vars = dict()
-        for filt_level in range(min_filt, max_filt + 1):
+        for filt_level in range(1, self.max_filtration + 1):
             for deg in range(self.min_grading, self.max_grading + 1):
                 fv = self.get_generators_by_filtration(filt_level)
                 vars = [v for v in self.get_generators_by_grading(deg) if v in fv]
@@ -894,23 +901,23 @@ class SpectralSequence(DGBase):
     def _set_filtered_differentials(self):
         """Sets filtered differentials as expressions"""
         diffs = dict()
-        for i, deg in self._filtered_vars.keys():
-            for j in [f[0] for f in list(self._filtered_vars.keys()) if f[0] <= i]:
-                non_j_vars_subs = {k: 0 for k, v in self.filtration_levels.items() if v != j}
-                diffs[(i, j, deg)] = {
-                    k: sympy.sympify(v.expression).subs(non_j_vars_subs)
+        for filt_dom, deg in self._filtered_vars.keys():
+            for filt_target in [f[0] for f in list(self._filtered_vars.keys()) if f[0] <= filt_dom]:
+                non_target_subs = {k: 0 for k, v in self.filtration_levels.items() if v != filt_target}
+                diffs[((filt_dom, deg), (filt_target, deg - 1))] = {
+                    k: sympy.sympify(v.expression).subs(non_target_subs)
                     for k, v in self.differentials.items()
-                    if k in self._filtered_vars[(i, deg)]
+                    if k in self._filtered_vars[(filt_dom, deg)]
                 }
         self._filtered_diffs = diffs
 
     def _set_initial_matrices(self):
         mats = dict()
         for k in self._filtered_diffs.keys():
-            i, j, deg = k
+            loc_dom, loc_target = k
             linear_map = LinearMap(
                 coeff_dict=self._filtered_diffs[k],
-                range_symbols=self._filtered_vars.get((j, deg - 1), list()),
+                range_symbols=self._filtered_vars.get(loc_target, list()),
                 coeff_mod=self.coeff_mod
             )
             mats[k] = linear_map.matrix
@@ -919,18 +926,22 @@ class SpectralSequence(DGBase):
     def _verify_matrix_dimensions(self):
         ranks = dict()
         for k in self._matrices.keys():
-            filt_dom, filt_target, deg = k
+            loc_dom, loc_target = k
             mat = self._matrices[k]
-            if (filt_dom, deg) not in ranks:
-                ranks[(filt_dom, deg)] = mat.n_cols
+            if loc_dom not in ranks:
+                ranks[loc_dom] = mat.n_cols
             else:
-                if ranks[(filt_dom, deg)] != mat.n_cols:
-                    raise ValueError()
-            if (filt_target, deg - 1) not in ranks:
-                ranks[(filt_target, deg - 1)] = mat.n_rows
+                if ranks[loc_dom] != mat.n_cols:
+                    shapes = {k: v.values.shape for k, v in self._matrices.items() if k[0] == loc_dom}
+                    raise ValueError(f"Matrices have mimatching dimensions for domain (filt, deg)={loc_dom}:\n"
+                                     f"shapes={shapes}")
+            if loc_target not in ranks:
+                ranks[loc_target] = mat.n_rows
             else:
-                if ranks[(filt_target, deg - 1)] != mat.n_rows:
-                    raise ValueError()
+                if ranks[loc_target] != mat.n_rows:
+                    shapes = {k: v.values.shape for k, v in self._matrices.items() if k[1] == loc_target}
+                    raise ValueError(f"Matrices have mimatching dimensions for target (filt, deg)={loc_target}:\n"
+                                     f"shapes={shapes}")
 
 
 class DGA(DGBase):
