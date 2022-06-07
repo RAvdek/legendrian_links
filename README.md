@@ -2,9 +2,9 @@
 
 An interactive application for analyzing Legendrian links. This project is currently under active development.
 
-Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to generalizations of the LCH algebra and be able to handle heavy computations. We also want to make analysis of knots accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams.
+The program focuses on enumerations of augmentations and computation of bilinearized homologies of LCH algebras and [planar diagram algebras (PDA)](https://arxiv.org/abs/2205.13031).  It uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce many extra crossings. Analysis of links is accessible through a web application (with minimal dependencies) for easy visual inspection of link diagrams. This means you don't need to know how to code to analyze basic examples.
 
-The program computes augmentations of LCH algebras and [planar diagram algebras](https://arxiv.org/abs/2205.13031). The program uses plat diagrams to represent Legendrians in R3. Plats make [holomorphic disks particularly nice](https://arxiv.org/abs/2104.00505) (helping with algorithmic computation), although putting a Legendrian in plat position will typically introduce extra crossings (hurting our ability to algorithmically compute).
+Much of this recreates [Sivek's lch.sage](https://www.ma.imperial.ac.uk/~ssivek/code/lch.sage) so that it will be applicable to PDA and be able to handle heavy computations. We've also benefited from studying code written by Josh Sabloff and collaborators which extends [gridlink](https://github.com/3-manifolds/gridlink). The most developed parts of this software are performance optimized algorithms for enumerating points in varieties over finite fields (see `main/polynomials.py`) and algorithmic computations of spectral sequence Betti numbers (see `main/algebra.py`). For an explanation of the latter, see [this note](https://drive.google.com/file/d/1BmXbRcE-ZUWhSj6n8E_wcMgKTp2UKWvf/view?usp=sharing).
 
 # Installation
 
