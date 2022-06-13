@@ -42,9 +42,11 @@ If we modify the above URL to `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,
 
 ![image info](./main/static/spec_poly_screenshot.png)
 
+When using the planar diagram algebra (`rsft` as in the above example), we always use the partition fully separates the link. Generators are words of chords written `{x_1,...,x_n}` where the `x_i` are the `x` coordinates of the chords in the diagram. In this case, we use `Z` gradings by default if the rotation numbers of the components of the link are all 0.
+
 Only use the web interface to compute augmentations for links with small numbers of crossings (say, < 30). You can monitor the terminal to see what computations are happening. For small numbers of crossings, computations of bilinearized Poincare polynomials may still take a while. Typically things will take a long time if there are many augmentations, which can be seen in the terminal logs.
 
-To visualize a plat diagram without computing any holomorphic disks, use a `lazy_disks=True` flag in your URL. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
+To visualize a plat diagram without computing any holomorphic disks, omit the `auto_dgas` flag. For example `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&lazy_disks=True`. You can visualize links of any size without putting much strain on your computer.
 
 # Python interface
 
