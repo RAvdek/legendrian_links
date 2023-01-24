@@ -118,6 +118,10 @@ class Matrix(object):
         else:
             raise ValueError(f'Matrix has unfriendly shape {self.values.shape}')
 
+    def delete(self, rows=[], cols=[]):
+        """Return the Matrix obtained by deleting rows and columns"""
+        return Matrix(np.delete(np.delete(self.values, rows, 0), cols, 1), coeff_mod=self.coeff_mod)
+
     def multiply(self, other):
         """Multiply self with another Matrix. Must have appropriate dimensions and have the same coeff modulus.
 
