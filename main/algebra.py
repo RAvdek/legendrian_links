@@ -142,7 +142,10 @@ class Matrix(object):
         :param array: 1-d array (list or numpy array)
         :return: 1-d numpy array
         """
-        return np.dot(self.values, array)
+        output = np.dot(self.values, array)
+        if self.coeff_mod != 0:
+            output %= self.coeff_mod
+        return output
 
     def rank_im(self):
         if self.n_rows == 0 or self.n_cols == 0:
@@ -180,6 +183,7 @@ class Matrix(object):
             ref, ref_q, ref_q_inv = self._row_reduce(ref, ref_q, ref_q_inv, row_num, col_num)
             row_num += 1
         self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
+        self.ref.ref_form = self.REF
         self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
         self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
         self._rank_im = row_num
@@ -224,6 +228,7 @@ class Matrix(object):
                 ref, ref_q, ref_q_inv = self._rref_normalize(ref, ref_q, ref_q_inv, row_num, col_num)
             ref, ref_q, ref_q_inv = self._rref_column_clean(ref, ref_q, ref_q_inv, row_num, col_num)
         self.ref = Matrix(ref, coeff_mod=self.coeff_mod)
+        self.ref.ref_form = self.RREF
         self.ref_q = Matrix(ref_q, coeff_mod=self.coeff_mod)
         self.ref_q_inv = Matrix(ref_q_inv, coeff_mod=self.coeff_mod)
         self.ref_form = self.RREF
@@ -235,14 +240,20 @@ class Matrix(object):
         if self.ref_form != self.RREF:
             self.set_red_row_echelon()
         # we can compute the span of the kernel using the free variable columns
-        pivot_columns = [p[1] for p in self.ref_pivot_indices]
         kernel = list()
+        # sorted pivot indices with largest row coming first
+        pivot_indices = sorted(self.ref_pivot_indices, key=lambda t: t[0], reverse=True)
         for i in self.ref_free_indices:
+            free_column = self.ref.values[:, i]
             v = np.zeros(self.n_cols)
             v[i] = 1
-            for j in pivot_columns:
-                if j < i:
-                    v[j] = -self.values[j, i]
+            relevant_pivots = [[r, c] for r, c in pivot_indices if c < i]
+            for r, c in relevant_pivots:
+                coeff = -free_column[r]
+                v[c] = coeff
+                free_column += coeff*self.ref.values[:, c]
+            if self.coeff_mod is not None:
+                v %= self.coeff_mod
             kernel.append(v)
         self._kernel = kernel
         return self._kernel
