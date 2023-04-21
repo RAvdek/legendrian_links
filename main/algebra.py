@@ -252,7 +252,7 @@ class Matrix(object):
                 coeff = -free_column[r]
                 v[c] = coeff
                 free_column += coeff*self.ref.values[:, c]
-            if self.coeff_mod is not None:
+            if self.coeff_mod != 0:
                 v %= self.coeff_mod
             kernel.append(v)
         self._kernel = kernel
