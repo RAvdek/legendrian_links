@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import json
 import logging
+import os
 import numpy as np
 import random
 import signal
@@ -55,8 +56,13 @@ def tiny_id(k=4):
 def in_main_thread():
     return threading.current_thread() == threading.main_thread()
 
+def os_is_posix():
+    return os.name == 'posix'
+
 @contextmanager
 def timeout_ctx(time):
+    if not os_is_posix():
+        return
     if not in_main_thread():
         raise RuntimeError("Trying to use timeout_ctx outside of main thread.")
     # Register a function to raise a TimeoutError on the signal.
@@ -68,6 +74,7 @@ def timeout_ctx(time):
     try:
         yield
     except TimeoutError:
+        LOG.info(f"Timeout reached at {time}s")
         pass
     finally:
         # Unregister the signal so it won't be triggered
