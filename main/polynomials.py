@@ -648,8 +648,10 @@ class SolutionSearchNode(object):
         if not in_main_thread:
             return False
         def new_ideal_basis():
-            with utils.timeout_ctx(self.groebner_timeout):
-                return ideal_basis(polys=self.polys, symbols=self.get_unset_vars(), modulus=self.modulus)
+            try:
+                with utils.timeout_manager(self.groebner_timeout) as to:
+                    return ideal_basis(polys=self.polys, symbols=self.get_unset_vars(), modulus=self.modulus)
+            except TimeoutError
         try:
             grob_polys = new_ideal_basis()
         except sympy.polys.polyerrors.CoercionFailed as e:

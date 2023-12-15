@@ -61,7 +61,7 @@ def os_is_posix():
     return os.name == 'posix'
 
 @contextmanager
-def timeout_ctx(time):
+def timeout_ctx(secs):
     if not os_is_posix():
         yield
     if not in_main_thread():
@@ -71,11 +71,11 @@ def timeout_ctx(time):
     # Schedule the signal to be sent after ``time``.
     # Using signal.alarm(time) requires time to be int while signal.setitimer allows float.
     # This is essential as waiting 1 second can be extremely expensive.
-    signal.setitimer(signal.ITIMER_REAL, time)
+    signal.setitimer(signal.ITIMER_REAL, secs)
     try:
         yield
     except TimeoutError:
-        LOG.info(f"Timeout reached at {time}s")
+        LOG.info(f"Timeout reached at {secs}s")
         pass
     finally:
         # Unregister the signal so it won't be triggered
@@ -85,6 +85,14 @@ def timeout_ctx(time):
 
 def raise_timeout_error(signum, frame):
     raise TimeoutError
+
+@contextmanager
+def timeout_manager(secs):
+    start_time = time.time()
+    while time.time() - start_time < secs:
+        yield
+    raise RuntimeError
+
 
 class Timeout(object):
     def __init__(self, seconds):
