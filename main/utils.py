@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import json
 import logging
 import os
+import time
 import numpy as np
 import random
 import signal
@@ -62,7 +63,7 @@ def os_is_posix():
 @contextmanager
 def timeout_ctx(time):
     if not os_is_posix():
-        return
+        yield
     if not in_main_thread():
         raise RuntimeError("Trying to use timeout_ctx outside of main thread.")
     # Register a function to raise a TimeoutError on the signal.
@@ -84,6 +85,19 @@ def timeout_ctx(time):
 
 def raise_timeout_error(signum, frame):
     raise TimeoutError
+
+class Timeout(object):
+    def __init__(self, seconds):
+        self.seconds = seconds
+    def __enter__(self):
+        self.die_after = time.time() + self.seconds
+        return self
+    def __exit__(self, type, value, traceback):
+        LOG.info(f"Timeout reached at {time}s")
+        pass
+    @property
+    def timed_out(self):
+        return time.time() > self.die_after
 
 
 # Methods for manipulating lists
