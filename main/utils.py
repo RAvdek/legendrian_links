@@ -86,27 +86,6 @@ def timeout_ctx(secs):
 def raise_timeout_error(signum, frame):
     raise TimeoutError
 
-@contextmanager
-def timeout_manager(secs):
-    start_time = time.time()
-    while time.time() - start_time < secs:
-        yield
-    raise RuntimeError
-
-
-class Timeout(object):
-    def __init__(self, seconds):
-        self.seconds = seconds
-    def __enter__(self):
-        self.die_after = time.time() + self.seconds
-        return self
-    def __exit__(self, type, value, traceback):
-        LOG.info(f"Timeout reached at {time}s")
-        pass
-    @property
-    def timed_out(self):
-        return time.time() > self.die_after
-
 
 # Methods for manipulating lists
 
