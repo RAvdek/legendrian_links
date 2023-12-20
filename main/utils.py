@@ -2,7 +2,6 @@ from contextlib import contextmanager
 import json
 import logging
 import os
-import time
 import numpy as np
 import random
 import signal
@@ -11,12 +10,12 @@ import threading
 import sympy
 
 
+OS_IS_POSIX = os.name == 'posix'
 with open('links.json') as f:
     LINKS = json.loads(f.read())
 
 
 # Logging helpers
-
 
 def get_logger(name):
     logging.basicConfig(format='%(asctime)s|%(name)s:%(lineno)d|%(levelname)s|%(message)s')
@@ -57,13 +56,11 @@ def tiny_id(k=4):
 def in_main_thread():
     return threading.current_thread() == threading.main_thread()
 
-def os_is_posix():
-    return os.name == 'posix'
-
 @contextmanager
 def timeout_ctx(time):
-    if not os_is_posix():
-        yield
+    # The implementation also depends on usage of a unix system. See https://docs.python.org/3/library/signal.html
+    if not OS_IS_POSIX:
+        pass
     if not in_main_thread():
         raise RuntimeError("Trying to use timeout_ctx outside of main thread.")
     # Register a function to raise a TimeoutError on the signal.
@@ -85,20 +82,6 @@ def timeout_ctx(time):
 
 def raise_timeout_error(signum, frame):
     raise TimeoutError
-
-class Timeout(object):
-    def __init__(self, seconds):
-        self.seconds = seconds
-    def __enter__(self):
-        self.die_after = time.time() + self.seconds
-        return self
-    def __exit__(self, type, value, traceback):
-        LOG.info(f"Timeout reached at {time}s")
-        pass
-    @property
-    def timed_out(self):
-        return time.time() > self.die_after
-
 
 # Methods for manipulating lists
 
