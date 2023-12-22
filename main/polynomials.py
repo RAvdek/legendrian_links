@@ -648,6 +648,8 @@ class SolutionSearchNode(object):
         if not in_main_thread:
             return False
         def new_ideal_basis():
+            if not utils.OS_IS_POSIX:
+                return
             with utils.timeout_ctx(self.groebner_timeout):
                 return ideal_basis(polys=self.polys, symbols=self.get_unset_vars(), modulus=self.modulus)
         try:

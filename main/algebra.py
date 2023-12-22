@@ -739,8 +739,8 @@ class MatrixChainComplex(object):
                 raise ValueError(f"Differential at degree {k} "
                                  f"has n_cols={d.n_cols} != self.ranks[k] = {self.ranks[k]}")
             k_min_1 = k - 1
-            if self.coeff_mod != 0:
-                k_min_1 %= self.coeff_mod
+            if self.grading_mod != 0:
+                k_min_1 %= self.grading_mod
             k_min_1_rank = self.ranks.get(k_min_1, 0)
             if d.n_rows != k_min_1_rank:
                 raise ValueError(f"Differential at degree k={k} "
