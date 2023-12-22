@@ -13,10 +13,3 @@ We want to do the minimal amount of work to implement the change. So...
 - the webapp should not be updated yet.
 - we won't yet want to think about computing augmentations for coefficient modulus other than 2, etc.
 We can think about this later if we have time :D
-
-The ``right way'' to do this is in a new git branch with a pull request. I will help set this up.
-It will help organize our conversation and review the work. When the work is done, I can move the changes into
-the `master` branch, which is what people will normally be working with.
-
-To start, send me the email that you want to have connected to GitHub and I will send you an invitation to collaborate
-on the project with further instructions.
