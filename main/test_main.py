@@ -125,6 +125,10 @@ class TestLinks(unittest.TestCase):
         self.assertFalse(hopf.word_is_admissible([chord_1, chord_2, chord_1], cyclic=True))
         self.assertFalse(hopf.word_is_admissible([chord_1, chord_2, chord_1, chord_2], cyclic=True))
 
+    def test_lch_orientations(self):
+        """TODO for lch_orientations: We will compute the LCH differentials of some links with signs"""
+        pass
+
 
 class TestZeroSet(unittest.TestCase):
 
