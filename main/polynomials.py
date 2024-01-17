@@ -459,7 +459,6 @@ class SolutionSearchNode(object):
         self._apply_subs()
         if len(self.polys) > 0:
             self._unique_polys()
-            self._setup_quads()
             self._update_subs_and_polys()
         self._cleanup_subs_and_symbols()
         self._set_subs_node()
@@ -542,14 +541,6 @@ class SolutionSearchNode(object):
 
     def _set_id(self):
         self.id = "{" + f"D={self.depth}:id=" + utils.tiny_id() + "}"
-
-    def _setup_quads(self):
-        if self.modulus == 2:
-            self._quads = set()
-            unset_symbols = self.get_unset_vars()
-            for s_1 in unset_symbols:
-                for s_2 in unset_symbols:
-                    self._quads.add(s_1 * s_2)
 
     def _cleanup_subs_and_symbols(self):
         if self.allow_unset:
@@ -718,32 +709,7 @@ class SolutionSearchNode(object):
                         self._apply_subs(specific_subs={g: p_min_g})
                         modified = True
                         self.counter.update([self.EVENT_AFFINE_SUB])
-            # check for terms of the form p = g - c for g a symbol and c a constant
-            # for c in self.ff_elements:
-            #    p_min_c = p_exp - c
-            #    if p_min_c.is_symbol:
-            #        del_indicies.add(i)
-            #        self.subs_dict[p_min_c] = c
-            #        self._apply_subs(specific_subs={p_min_c: c})
-            #        modified = True
-            #        break
-            # over Z/2Z we can also manually remove quadratic terms.
-            # I've seen these come up frequently.
-            # p = sym_1 * sym_2 + 1 = 0 => both are 1.
-            # we should be able to generalize this to things of the form p = 1 + x_1 * ... * x_k
-            # though I don't know how useful it would be
-            if self.modulus == 2:
-                # this is poorly designed: p_exp + 1 won't be in self._quads,
-                # even though elements may agree over Z/2Z
-                if p_exp - 1 in self._quads:
-                    del_indicies.add(i)
-                    # this will extract the individual factors
-                    sym_1, sym_2 = (p_exp - 1).as_ordered_factors()
-                    self.subs_dict[sym_1] = 1
-                    self.subs_dict[sym_2] = 1
-                    self._apply_subs(specific_subs={sym_1: 1, sym_2: 1})
-                    modified = True
-                    self.counter.update([self.EVENT_QUAD_SUB])
+            # TODO: If coeff_mod=2 and p_exp=1 + x_1*...*x_k, then all x_k=1.
         if modified:
             polys_copy = [v for i, v in enumerate(self.polys) if i not in del_indicies]
             self.polys = polys_copy
