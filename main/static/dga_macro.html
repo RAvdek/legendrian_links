@@ -1,4 +1,5 @@
 {% macro dga(ctx) -%}
+{% if not ctx["skip_augs"] %}
 {% if ctx["has_augs"] %}
 Poincare polynomials for {{ ctx["name"] }} augmentations:
 <ul>
@@ -47,6 +48,7 @@ Dual Poincare polynomials for {{ ctx["name"] }} augmentations
 </table>
 {% else %}
 No non-trivial augmentations found for {{ ctx["name"] }}
+{% endif %}
 {% endif %}
 <br><br>
 <table>

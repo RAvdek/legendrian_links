@@ -962,7 +962,7 @@ class SpectralSequence(DGBase):
 class DGA(DGBase):
 
     def __init__(self, gradings, differentials, filtration_levels=None, coeff_mod=0, grading_mod=0, spec_poly=False,
-                 lazy_aug_data=False, lazy_augs=False, lazy_bilin=False, aug_fill_na=None):
+                 lazy_augs=False, lazy_bilin=False, aug_fill_na=None):
         super(DGA, self).__init__(
             gradings=gradings,
             differentials=differentials,
@@ -981,7 +981,6 @@ class DGA(DGBase):
         self.bilin_polys_dual = dict()
         self.lin_poly_list = None
         self.bilin_poly_list = None
-        self.lazy_aug_data = lazy_aug_data
         self.lazy_augs = lazy_augs
         self.lazy_bilin = lazy_bilin
         self.aug_fill_na = aug_fill_na
@@ -994,9 +993,8 @@ class DGA(DGBase):
         self.aug_symbols_to_comm_symbols = None
         self.aug_analysis_table = None
         self.aug_polys = None
-        if not lazy_aug_data:
-            self.set_aug_data()
         if not lazy_augs:
+            self.set_aug_data()
             self.set_augmentations()
             if not lazy_bilin:
                 self.set_all_bilin()
@@ -1037,8 +1035,7 @@ class DGA(DGBase):
             coeff_mod=storage['coeff_mod'],
             grading_mod=storage['grading_mod'],
             lazy_augs=True,
-            lazy_bilin=True,
-            lazy_aug_data=True
+            lazy_bilin=True
         )
         dga._aug_vars_set = storage.get('_aug_vars_set')
         dga.aug_comm_symbols_to_symbols = storage.get('aug_comm_symbols_to_symbols')

@@ -24,6 +24,10 @@ You may need to modify the version of python in Pipfile so that this is compatib
 
 When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. The `crossings` parameter gives a plat presentation of the link in the front projection, with crossing indices ranging from 0 to `n_strands` - 2, ordered from left to right.
 
+Here is a screenshot for `http://127.0.0.1:5000/?n_strands=4&crossings=1,1,1&lch_signs=True` which computes the LCH algebra of the trefoil over the integers.
+
+![image info](./main/static/screenshot_trefoil_signs.png)
+
 Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1,3,3&auto_dgas=rsft`, giving a [polyfillable link](https://arxiv.org/abs/1307.7998):
 
 ![image info](./main/static/screenshot.png)
@@ -31,10 +35,11 @@ Here is a screenshot for `http://127.0.0.1:5000/?n_strands=6&crossings=3,1,2,2,1
 Here is a complete list of url arguments:
 - `n_strands`: How many strands of the plat? Must be a positive even integer.
 - `crossings`: Crossings of the plat in the front projection. This will be resolved using Lagrangian resolution.
-- `auto_dgas`: `lch`, `rsft`, or both (`lch,rsft`). Which DGAs should we analyze? Here `rsft` is the planar diagram algebra.
 - `mirror`: If True, reverse order of the the front_crossings.
 - `n_copy`: If provided with an integer, will make an n-copy diagram.
 - `orientation_flips`: Comma separated list of True/False. Will change the orientations of the link components.
+- `lch_signs`: If True, compute LCH DGA over the integers. Only differentials will be displayed and the remaining flags will be ignored. 
+- `auto_dgas`: `lch`, `rsft`, or both (`lch,rsft`). Which DGAs should we analyze? Here `rsft` is the planar diagram algebra.
 - `aug_fill_na`: 0 or 1 if used. Use only is there are many augmentations. Augmentations will always be computed with some variables set to `None` (meaning that they could take on any value, 0 or 1). If `aug_fill_na` is not None, we use this number to fill in these values.
 - `spec_poly`: If True and `auto_dgas=rsft`, will compute the spectral sequence polynomials associated to bilinearizations as described in [the article](https://arxiv.org/abs/2205.13031).
 

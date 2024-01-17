@@ -142,12 +142,19 @@ class DiskCorner(object):
         self.lch_orientation = None
 
     def set_lch_orientation(self):
-        """TODO for lch_orientation: Function will set the attribute self.lch_orientation to either +1 or -1
-        This number can be determined by looking at self.corner and comparing with the orientations of
-        the strands of the link. The orientations of the strands can be read from
-        self.chord.top_line_segment.orientation and self.chord.bottom_line_segment.orientation
-        both or which will be either `l' for left or `r' for right."""
-        raise NotImplementedError
+        c = self.corner  # direction towards which the corner points
+        if self.chord.top_line_segment.orientation != self.chord.bottom_line_segment.orientation:
+            self.lch_orientation = 1
+        elif self.chord.top_line_segment.orientation == 'r' and self.chord.bottom_line_segment.orientation == 'r':
+            if c == 'r' or c == 'd':
+                self.lch_orientation = -1
+            else:
+                self.lch_orientation = 1
+        elif self.chord.top_line_segment.orientation == 'l' and self.chord.bottom_line_segment.orientation == 'l':
+            if c == 'l' or c == 'u':
+                self.lch_orientation = -1
+            else:
+                self.lch_orientation = 1
 
     def __repr__(self):
         return str(self.to_dict())
@@ -271,6 +278,9 @@ class Disk(object):
     def __init__(self, disk_segments):
         self.disk_segments = disk_segments
         self._set_disk_corners()
+        self.lch_orientation = None
+        if self.is_lch():
+            self.set_lch_orientation()
 
     def __repr__(self):
         return str([str(dc) for dc in self.disk_corners])
@@ -297,13 +307,16 @@ class Disk(object):
     def is_lch(self):
         return len(self.pos_corners) == 1
 
-    def lch_orientation(self):
+    def set_lch_orientation(self):
         """TODO for lch_orientation: This function should return a +1 or -1 when the disk is of LCH type.
         It can be computed from the lch_orientation's of the self.disk_corners"""
         if not self.is_lch():
             raise RuntimeError("Trying to compute LCH orientation for non-LCH disk")
-        raise NotImplementedError
-
+        orientation = 1
+        for c in self.disk_corners:
+            c.set_lch_orientation()
+            orientation = orientation * c.lch_orientation
+        self.lch_orientation = orientation
 
 class PlatSegment(object):
 
@@ -503,7 +516,10 @@ class CappingPath(object):
 
 class PlatDiagram(object):
 
-    def __init__(self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False, lazy_lch=True, lazy_rsft=True, aug_fill_na=None, spec_poly=False):
+    def __init__(
+            self, n_strands, front_crossings=[], n_copy=1, orientation_flips=None, mirror=False, lazy_disks=False,
+            lazy_lch=True, lazy_rsft=True, aug_fill_na=None, spec_poly=False
+    ):
         self.n_strands = n_strands
         if mirror:
             self.front_crossings = list(reversed(front_crossings))
@@ -517,7 +533,7 @@ class PlatDiagram(object):
         self.lazy_rsft = lazy_rsft
         self.aug_fill_na = aug_fill_na
         LOG.info(
-            f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, mirror={mirror}"
+            f"PlatDiagram(n_strands={n_strands}, front_crossings={front_crossings}, mirror={mirror}, "
             f"n_copy={n_copy}, lazy_disks={lazy_disks}, lazy_lch={lazy_lch}, lazy_rsft={lazy_rsft}), "
             f"aug_fill_na={aug_fill_na}")
 
@@ -540,6 +556,8 @@ class PlatDiagram(object):
         if lazy_disks:
             return
         self.set_disks_and_gradings()
+        self.lch_dga = None
+        self.rsft_dga = None
         if not lazy_lch:
             self.set_lch()
         if not lazy_rsft:
@@ -713,10 +731,10 @@ class PlatDiagram(object):
         self._set_disks()
         self._set_disk_corners()
 
-    def set_lch(self, lazy_augs=False, lazy_bilin=False):
+    def set_lch(self, lazy_augs=False, lazy_bilin=False, coeff_mod=2):
         self._set_lch_grading_mod()
         self._set_lch_generators()
-        self._set_lch_dga(lazy_augs=lazy_augs, lazy_bilin=lazy_bilin)
+        self._set_lch_dga(lazy_augs=lazy_augs, lazy_bilin=lazy_bilin, coeff_mod=coeff_mod)
 
     def set_rsft(self, lazy_augs=False, lazy_bilin=False):
         self._set_composable_admissible_words()
@@ -973,7 +991,7 @@ class PlatDiagram(object):
         self.lch_generators = lch_generators
 
     @utils.log_start_stop
-    def _set_lch_dga(self, lazy_augs=False, lazy_bilin=False):
+    def _set_lch_dga(self, lazy_augs=False, lazy_bilin=False, coeff_mod=2):
         lch_disks = [d for d in self.disks if d.is_lch()]
         lch_del = {g: 0 for g in self.lch_generators}
         for d in lch_disks:
@@ -988,17 +1006,14 @@ class PlatDiagram(object):
             else:
                 neg_word = [1]
             # Add negative word of chords as a summand to the LCH
-            # TODO for lch_orientations: Add sign contributions
-            lch_del[pos_generator] += utils.prod(neg_word)
+            lch_del[pos_generator] += d.lch_orientation * utils.prod(neg_word)
         lch_del = {
             g.symbol: algebra.Differential(lch_del[g])
             for g in lch_del.keys()
         }
         gradings = {g.symbol: g.grading for g in self.lch_generators}
-        # TODO for lch_orientations: Allow coeff_mod != 0. Russell can help with this to ensure
-        # that other functionality does not break.
         self.lch_dga = algebra.DGA(
-            gradings=gradings, differentials=lch_del, coeff_mod=2, grading_mod=self.lch_grading_mod,
+            gradings=gradings, differentials=lch_del, coeff_mod=coeff_mod, grading_mod=self.lch_grading_mod,
             lazy_augs=lazy_augs, lazy_bilin=lazy_bilin, aug_fill_na=self.aug_fill_na
         )
 
