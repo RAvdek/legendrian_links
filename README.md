@@ -24,7 +24,7 @@ You may need to modify the version of python in Pipfile so that this is compatib
 
 When you run `app.py` as above, a URL should appear which you can access from your web browser. Parameters `n_strands` and `crossings` (indicating front crossings) can be added. The `crossings` parameter gives a plat presentation of the link in the front projection, with crossing indices ranging from 0 to `n_strands` - 2, ordered from left to right.
 
-Here is a screenshot for `http://127.0.0.1:5000/?n_strands=4&crossings=1,1,1&lch_signs=True` which computes the LCH algebra of the trefoil over the integers.
+Here is a screenshot for `http://127.0.0.1:5000/?n_strands=4&crossings=1,1,1&lch_signs=True` which computes the LCH algebra of the trefoil over the integers. Our convention for signs is given by Figure 4 of [Etnyre and Ng's survey](https://arxiv.org/abs/1811.10966).
 
 ![image info](./main/static/screenshot_trefoil_signs.png)
 
