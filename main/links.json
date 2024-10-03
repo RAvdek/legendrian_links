@@ -15,14 +15,24 @@
     "front_crossings": [1, 1, 1]
   },
   "4_1": {
-    "comment": "Figure 8 with augmentation not coming from a filling",
-    "n_strands": 6,
-    "front_crossings": [3,2,1,0,2,0,4,4,0,1,2,3]
+    "comment": "Figure 8 with a single homotopy class of augmentation, which cannot come from a filling since tb=-3",
+    "n_strands": 4,
+    "front_crossings": [1,2,2,0,0,1,1]
+  },
+  "6_1": {
+    "comment": "6_1 with an augmentation, which cannot come from a filling since tb=-3",
+    "n_strands": 4,
+    "front_crossings": [1,2,2,0,0,0,0,1,1]
   },
   "m5_2_1": {
     "comment": "One of the original 5_2",
     "n_strands": 4,
     "front_crossings": [1,1,0,2,1,1,1]
+  },
+  "m6_1_2": {
+    "comment": "Second m6_1 from the Legendrian knot atlas",
+    "n_strands": 4,
+    "front_crossings": [1,2,2,0,0,1,1,0,2,1,1]
   },
   "polyfillable": {
     "comment": "Polyfillable link from https://arxiv.org/abs/1307.7998",

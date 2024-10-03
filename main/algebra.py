@@ -42,6 +42,8 @@ class Differential(object):
                     output_summands.append(coeff * monom)
                 elif not monom.is_number:
                     args = monom.args
+                    # TODO: The reason that this works is because in the app an x^**2 term can never appear
+                    # in a differential. This method is not applicable in abstract algebraic settings :(
                     for i in range(len(args)):
                         factor_1 = utils.prod([s.subs(subs_1) for s in args[:i]])
                         linear_term = args[i]
@@ -998,6 +1000,63 @@ class DGA(DGBase):
             self.set_augmentations()
             if not lazy_bilin:
                 self.set_all_bilin()
+
+    def get_cylinder(self, spec_poly=False, lazy_augs=False, lazy_bilin=False, aug_fill_na=None):
+        """Return Baues-Lemair cylinder"""
+
+        symbols_l = {v: sympy.Symbol(v.name + 'L', commutative=False) for v in self.symbols}
+        symbols_r = {v: sympy.Symbol(v.name + 'R', commutative=False) for v in self.symbols}
+        symbols_h = {v: sympy.Symbol(v.name + 'H', commutative=False) for v in self.symbols}
+
+        cyl_gradings = dict()
+        for k, v in self.gradings.items():
+            cyl_gradings[symbols_l[k]] = v
+            cyl_gradings[symbols_r[k]] = v
+            cyl_gradings[symbols_h[k]] = v + 1
+
+        cyl_diffs = dict()
+        for k, v in self.differentials.items():
+            poly = sympy.sympify(v.expression)
+            diff_l = 0
+            diff_r = 0
+            diff_h = symbols_r[k] - symbols_l[k]
+            if poly.is_number:
+                diff_l = poly
+                diff_r = poly
+            else:
+                # override use of defaultdict
+                coeff_dict = dict(poly.as_coefficients_dict())
+                for monom, coeff in coeff_dict.items():
+                    if monom == 1:
+                        diff_l += coeff
+                        diff_r += coeff
+                    if monom.is_symbol:
+                        diff_l += coeff * symbols_l[monom]
+                        diff_r += coeff * symbols_r[monom]
+                        diff_h += coeff * symbols_h[monom]
+                    else:
+                        args = monom.args
+                        for i in range(len(args)):
+                            diff_l += coeff * monom.subs(symbols_l)
+                            diff_r += coeff * monom.subs(symbols_r)
+                            factor_1 = utils.prod([s.subs(symbols_l) for s in args[:i]])
+                            linear_term = args[i].subs(symbols_h)
+                            factor_2 = utils.prod([s.subs(symbols_r) for s in args[i + 1:]])
+                            diff_h += coeff * factor_1 * linear_term * factor_2
+            cyl_diffs[symbols_l[k]] = Differential(expression=diff_l, coeff_mod=self.coeff_mod)
+            cyl_diffs[symbols_r[k]] = Differential(expression=diff_r, coeff_mod=self.coeff_mod)
+            cyl_diffs[symbols_h[k]] = Differential(expression=diff_h, coeff_mod=self.coeff_mod)
+        return DGA(
+            gradings=cyl_gradings,
+            differentials=cyl_diffs,
+            filtration_levels=self.filtration_levels,
+            coeff_mod=self.coeff_mod,
+            grading_mod=self.grading_mod,
+            spec_poly=spec_poly,
+            lazy_augs=lazy_augs, lazy_bilin=lazy_bilin,
+            aug_fill_na=aug_fill_na
+        )
+
 
     def pickle(self, file_name, compress=True):
         storage = dict()

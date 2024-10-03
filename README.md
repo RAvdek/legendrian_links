@@ -112,6 +112,11 @@ Now we can proceed with computing bilinearized homologies, etc. If the number of
 >>> pd.lch_dga.decompress_augmentations(fill_na=0)
 ```
 
+*NEW* To get the Baues-Lemaire cylinder of a dga...
+```
+>>> cyl = pd.lch_dga.get_cylinder()
+```
+
 # Poincare polynomials
 
 The classes `ChainComplex`, `MatrixChainComplex`, and `SpectralSequence` all have `poincare_polynomial()` methods. The `DGA` class can use these to compute polynomials associated to (bi)linearized homologies. Our convention for polynomials of a chain complex yield
